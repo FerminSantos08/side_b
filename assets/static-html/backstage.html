@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Backstage de SIDE B.">
+  <title>Backstage — SIDE B</title>
+  <link rel="icon" href="assets/favicons/favicon.ico" sizes="any">
+  <link rel="icon" href="assets/favicons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/favicons/apple-touch-icon.png">
+  <link rel="manifest" href="assets/favicons/site.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/variables.css">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/backstage.css">
+</head>
+<body>
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html" aria-label="SIDE B, inicio">SIDE B<span class="brand-dot">.</span></a>
+      <nav class="primary-nav" aria-label="Navegación principal">
+        <a class="nav-link" href="index.html">Ver sitio</a>
+        <a class="nav-link is-active" href="backstage.html" aria-current="page">Backstage</a>
+      </nav>
+      <div class="header-actions" aria-label="Acciones de usuario">
+        <a class="icon-button" href="perfil.html" aria-label="Mi perfil"><span class="icon icon-user" aria-hidden="true"></span></a>
+      </div>
+      <button class="menu-button" type="button" aria-label="Abrir menú"><span></span><span></span></button>
+    </div>
+  </header>
+
+  <main id="contenido" class="backstage-page container">
+    <div class="backstage-heading">
+      <div>
+        <p class="eyebrow">Administración de plataforma</p>
+        <h1>Backstage<br><em>SIDE B.</em></h1>
+      </div>
+      <p class="backstage-intro">Gestiona el contenido, la comunidad y el catálogo desde un solo lugar.</p>
+    </div>
+
+    <section class="backstage-shell" aria-label="Módulos de administración">
+      <aside class="backstage-sidebar">
+        <p class="filter-label">Módulos</p>
+        <nav class="backstage-menu" aria-label="Menú Backstage">
+          <a class="is-active" href="#resumen" aria-current="page"><span>01</span> Resumen</a>
+          <a href="#editorial"><span>02</span> Editorial</a>
+          <a href="#artists"><span>03</span> Artists</a>
+          <a href="#audience"><span>04</span> Audience</a>
+          <a href="#catalog"><span>05</span> Catalog</a>
+          <a href="#orders"><span>06</span> Orders</a>
+          <a href="#access"><span>07</span> Access</a>
+        </nav>
+        <a class="backstage-return" href="index.html">← Volver al sitio</a>
+      </aside>
+
+      <section class="backstage-content" id="resumen" aria-labelledby="backstage-title">
+        <p class="eyebrow">Panel de control</p>
+        <h2 id="backstage-title">Elige un área<br><em>para administrar.</em></h2>
+        <p class="backstage-note">Los módulos quedarán conectados a PHP y MySQL al definir el esquema de datos. Esta navegación conserva la estructura prevista para el CRUD.</p>
+
+        <div class="module-grid">
+          <a class="module-card" id="editorial" href="#editorial">
+            <span class="module-number">01</span>
+            <p class="card-kicker">Contenido</p>
+            <h3>Editorial</h3>
+            <p>Publicaciones, autores, fechas y estados de publicación.</p>
+            <span class="module-link">Gestionar publicaciones <b aria-hidden="true">↗</b></span>
+          </a>
+          <a class="module-card" id="artists" href="#artists">
+            <span class="module-number">02</span>
+            <p class="card-kicker">Perfiles</p>
+            <h3>Artists</h3>
+            <p>Altas, datos y estado de los artistas de la plataforma.</p>
+            <span class="module-link">Gestionar artistas <b aria-hidden="true">↗</b></span>
+          </a>
+          <a class="module-card" id="audience" href="#audience">
+            <span class="module-number">03</span>
+            <p class="card-kicker">Comunidad</p>
+            <h3>Audience</h3>
+            <p>Usuarios, roles, búsqueda y estado de las cuentas.</p>
+            <span class="module-link">Gestionar usuarios <b aria-hidden="true">↗</b></span>
+          </a>
+          <a class="module-card" id="catalog" href="#catalog">
+            <span class="module-number">04</span>
+            <p class="card-kicker">Tienda</p>
+            <h3>Catalog</h3>
+            <p>Productos, categorías, existencias, precios e imágenes.</p>
+            <span class="module-link">Gestionar catálogo <b aria-hidden="true">↗</b></span>
+          </a>
+          <a class="module-card" id="orders" href="#orders">
+            <span class="module-number">05</span>
+            <p class="card-kicker">Operación</p>
+            <h3>Orders</h3>
+            <p>Pedidos, artículos, importes, usuarios y seguimiento.</p>
+            <span class="module-link">Consultar pedidos <b aria-hidden="true">↗</b></span>
+          </a>
+          <a class="module-card" id="access" href="#access">
+            <span class="module-number">06</span>
+            <p class="card-kicker">Seguridad</p>
+            <h3>Access</h3>
+            <p>Permisos para Listener, Artist y Executive Producer.</p>
+            <span class="module-link">Gestionar accesos <b aria-hidden="true">↗</b></span>
+          </a>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-bottom"><span>© 2026 SIDE B — Backstage</span><span>Administración de plataforma</span></div>
+  </footer>
+</body>
+</html>

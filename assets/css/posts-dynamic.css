@@ -1,0 +1,5 @@
+.story-image img { height: 100%; inset: 0; object-fit: cover; position: absolute; width: 100%; z-index: 0; }
+.story-image .image-number, .story-image .image-stamp { z-index: 1; }
+.detail-cover img { height: 100%; inset: 0; object-fit: cover; position: absolute; width: 100%; z-index: 0; }
+.detail-cover .image-stamp { z-index: 1; }
+.posts-grid .profile-note { grid-column: 1 / -1; }

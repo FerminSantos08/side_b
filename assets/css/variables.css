@@ -1,0 +1,21 @@
+:root {
+  --color-graphite: #292a27;
+  --color-ivory: #eae3d6;
+  --color-olive: #858c77;
+  --color-terracotta: #a96f58;
+  --color-ink: #292a27;
+  --color-muted: #706f67;
+  --color-paper: #f4f0e8;
+  --color-surface: #ded8cc;
+  --color-border: rgba(41, 42, 39, .18);
+  --color-border-light: rgba(234, 227, 214, .24);
+  --color-focus: #b8523b;
+  --color-white: #fffdf8;
+  --font-ui: "Space Grotesk", sans-serif;
+  --font-display: "Instrument Serif", Georgia, serif;
+  --max-width: 1280px;
+  --space-section: clamp(5rem, 9vw, 9rem);
+  --radius-sm: 2px;
+  --radius-pill: 999px;
+  --shadow-soft: 0 18px 50px rgba(41, 42, 39, .08);
+}
