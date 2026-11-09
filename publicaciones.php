@@ -34,9 +34,8 @@ $surfaces = ['visual-surface--portrait', 'visual-surface--warm', 'visual-surface
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Publicaciones y artículos de cultura musical en SIDE B.">
   <title>Publicaciones — SIDE B</title>
-  <link rel="icon" href="assets/favicons/favicon.ico" sizes="any">
-  <link rel="icon" href="assets/favicons/favicon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="assets/favicons/apple-touch-icon.png">
+  <link rel="icon" href="assets/favicons/sideb_sf.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/favicons/sideb_sf.png">
   <link rel="manifest" href="assets/favicons/site.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

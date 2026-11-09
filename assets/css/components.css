@@ -2,6 +2,7 @@
 .header-inner { align-items: center; display: flex; min-height: 86px; gap: 3rem; }
 .brand { align-items: center; display: inline-flex; font-size: 26px; font-weight: 700; gap: .45rem; letter-spacing: -.11em; line-height: 1; }
 .brand-dot { color: var(--color-terracotta); }
+.brand::before { background: url('../favicons/sideb_sf.png') center / contain no-repeat; content: ''; display: block; flex: 0 0 48px; height: 48px; width: 48px; }
 .primary-nav { display: flex; gap: 2rem; margin-left: auto; }
 .nav-link { color: var(--color-muted); font-size: 15px; position: relative; transition: color .2s ease; }
 .nav-link:hover, .nav-link.is-active { color: var(--color-ink); }
@@ -41,6 +42,7 @@
 .site-footer { background: var(--color-graphite); color: var(--color-ivory); padding-top: 4rem; }
 .footer-top { align-items: start; display: grid; gap: 3rem; grid-template-columns: 1.2fr 1fr 1fr auto; padding-bottom: 4rem; }
 .brand--footer { color: var(--color-ivory); font-size: 34px; }
+.brand--footer::before { height: 72px; width: 72px; }
 .footer-top > p { color: rgba(234,227,214,.65); font-family: var(--font-display); font-size: 23px; line-height: 1.1; }
 .footer-top nav { display: grid; gap: .75rem; }
 .footer-top nav a, .footer-social a { color: rgba(234,227,214,.72); font-size: 12px; }
@@ -52,3 +54,4 @@
 .logout-form { margin-left: .65rem; }
 .logout-form button { background: transparent; border: 1px solid var(--color-border); color: var(--color-muted); cursor: pointer; font: inherit; font-size: 12px; padding: .55rem .75rem; }
 .logout-form button:hover { border-color: var(--color-terracotta); color: var(--color-terracotta); }
+.logout-form:has(.logout-icon-button){margin-left:.65rem}.logout-form .logout-icon-button{align-items:center;background:transparent;border:0;color:#A96F58;display:inline-flex;height:28px;justify-content:center;padding:0;position:relative;transition:background .2s ease,color .2s ease;width:28px}.logout-form .logout-icon-button:hover{background:rgba(169,111,88,.13);border:0;color:#8d553f}.logout-form .logout-icon-button:focus-visible{background:rgba(169,111,88,.13);outline:2px solid var(--color-focus);outline-offset:3px}.logout-icon{fill:none;height:22px;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:2;width:22px}.logout-icon-label{clip:rect(0 0 0 0);clip-path:inset(50%);height:1px;overflow:hidden;position:absolute;white-space:nowrap;width:1px}.logout-icon-button::after{background:var(--color-graphite);color:var(--color-ivory);content:attr(data-tooltip);font:500 11px var(--font-ui);left:50%;opacity:0;padding:.4rem .55rem;pointer-events:none;position:absolute;top:calc(100% + .55rem);transform:translate(-50%,-4px);transition:opacity .2s ease,transform .2s ease;visibility:hidden;white-space:nowrap;z-index:10}.logout-icon-button:hover::after,.logout-icon-button:focus-visible::after{opacity:1;transform:translate(-50%,0);visibility:visible}

@@ -20,6 +20,6 @@ HTML;
     if (basename((string) ($_SERVER['SCRIPT_NAME'] ?? '')) === 'tienda.php') {
         $footer .= '<style>.catalog-grid{grid-template-columns:repeat(auto-fill,minmax(210px,280px));justify-content:start}.catalog-grid .product-image::before,.catalog-grid .product-image::after{display:none!important}.catalog-grid .product-image img{display:block;height:100%;object-fit:contain;width:100%}</style>';
     }
-    if (!$administrativePage) return $footer . '<script>(function(){var style=document.querySelector("link[href*=\"assets/css/components.css\"]");if(style)style.href="assets/css/components.css?v=2";})();</script>';
+    if (!$administrativePage) return $footer . '<link rel="stylesheet" href="assets/css/profile-menu-icons.css"><style>.profile-logout-note{display:none}</style><script>(function(){var style=document.querySelector("link[href*=\"assets/css/components.css\"]");if(style)style.href="assets/css/components.css?v=2";})();</script>';
     return $footer . '<link rel="stylesheet" href="assets/css/admin-navigation.css?v=1"><script>(function(){var style=document.querySelector("link[href*=\"assets/css/backstage.css\"]");if(style)style.href="assets/css/backstage.css?v=6";})();</script>';
 }

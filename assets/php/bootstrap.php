@@ -3,6 +3,33 @@ declare(strict_types=1);
 require_once __DIR__ . '/footer.php';
 
 /* Las credenciales se leen del entorno: DB_HOST, DB_PORT, DB_NAME, DB_USER y DB_PASSWORD. */
+/* En desarrollo local también se leen desde el archivo .env en la raíz del proyecto. */
+function load_local_env(): void
+{
+    static $loaded = false;
+    if ($loaded) return;
+    $loaded = true;
+
+    $envFile = dirname(__DIR__, 2) . '/.env';
+    if (!is_readable($envFile)) return;
+
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) continue;
+        [$key, $value] = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value);
+        if (!preg_match('/^[A-Z_][A-Z0-9_]*$/', $key) || getenv($key) !== false) continue;
+        if ((str_starts_with($value, '"') && str_ends_with($value, '"')) || (str_starts_with($value, "'") && str_ends_with($value, "'"))) {
+            $value = substr($value, 1, -1);
+        }
+        putenv($key . '=' . $value);
+        $_ENV[$key] = $value;
+    }
+}
+
+load_local_env();
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_set_cookie_params([
         'httponly' => true,
@@ -104,8 +131,11 @@ function logout_control(): string
     if (empty($_SESSION['user_id'])) return '';
     $adminPage = in_array(basename((string) ($_SERVER['SCRIPT_NAME'] ?? '')), ['backstage.php', 'admin.php', 'editorial.php'], true);
     $class = $adminPage ? 'logout-form logout-form--admin' : 'logout-form';
-    $label = $adminPage ? '<svg class="admin-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3M21 3v18"/></svg>Cerrar sesión' : 'Cerrar sesión';
-    $form = '<form class="' . $class . '" method="post" action="logout.php"><input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '"><button type="submit">' . $label . '</button></form>';
+    $label = $adminPage
+        ? '<svg class="admin-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3M21 3v18"/></svg>Cerrar sesión'
+        : '<svg class="logout-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg><span class="logout-icon-label">Cerrar sesión</span>';
+    $buttonAttributes = $adminPage ? '' : ' class="logout-icon-button" aria-label="Cerrar sesión" data-tooltip="Cerrar sesión" title="Cerrar sesión"';
+    $form = '<form class="' . $class . '" method="post" action="logout.php"><input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '"><button type="submit"' . $buttonAttributes . '>' . $label . '</button></form>';
     if (!$adminPage) return $form;
 
     $isExecutive = is_executive_producer();
@@ -147,6 +177,100 @@ function logout_control(): string
     </style>';
     return $form . $styles . '<script>' . $javascript . 'document.addEventListener("DOMContentLoaded",function(){var brand=document.querySelector(".site-header .brand");if(brand)brand.href="backstage.php";});</script><script src="assets/js/admin-product-album.js" defer></script>';
 }
+
+function sideb_profile_menu(string $active): string
+{
+    $items = [
+        'perfil' => ['perfil.php', 'Datos personales', '<svg class="profile-menu-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>'],
+        'guardados' => ['guardados.php', 'Guardados', '<svg class="profile-menu-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>'],
+        'pedidos' => ['pedidos.php', 'Mis pedidos', '<svg class="profile-menu-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></svg>'],
+    ];
+    $menu = '<nav class="profile-menu" aria-label="Menú de perfil">';
+    foreach ($items as $key => [$href, $label, $icon]) {
+        $isActive = $active === $key;
+        $menu .= '<a' . ($isActive ? ' class="is-active" aria-current="page"' : '') . ' href="' . $href . '">' . $icon . '<span>' . $label . '</span></a>';
+    }
+    return $menu . '</nav>';
+}
+/** @return list<array<string,mixed>> */
+function cart_items_for_user(PDO $database, int $userId, bool $lock = false): array
+{
+    $statement = $database->prepare(
+        'SELECT ci.id_item, ci.producto_id, ci.cantidad, p.nombre, p.precio, p.stock, p.activo,
+                p.imagen, p.slug, c.nombre AS categoria
+         FROM carrito_item AS ci
+         INNER JOIN producto AS p ON p.id_producto = ci.producto_id
+         INNER JOIN categoria_producto AS c ON c.id_categoria = p.categoria_id
+         WHERE ci.usr_id = :user
+         ORDER BY ci.fecha_agregado DESC' . ($lock ? ' FOR UPDATE' : '')
+    );
+    $statement->execute(['user' => $userId]);
+    return $statement->fetchAll();
+}
+
+function cart_count_for_current_user(): int
+{
+    if (empty($_SESSION['user_id'])) return 0;
+    try {
+        $statement = db()->prepare('SELECT COALESCE(SUM(cantidad), 0) FROM carrito_item WHERE usr_id = :user');
+        $statement->execute(['user' => (int) $_SESSION['user_id']]);
+        return (int) $statement->fetchColumn();
+    } catch (Throwable) {
+        return 0;
+    }
+}
+
+function cart_money(float $amount): string
+{
+    return '$' . number_format($amount, 2);
+}
+
+function paypal_config(): array
+{
+    $clientId = (string) (getenv('PAYPAL_CLIENT_ID') ?: '');
+    $secret = (string) (getenv('PAYPAL_CLIENT_SECRET') ?: '');
+    $mode = strtolower((string) (getenv('PAYPAL_MODE') ?: 'sandbox'));
+    if ($clientId === '' || $secret === '') throw new RuntimeException('PayPal no está configurado en el servidor.');
+    return ['client_id' => $clientId, 'secret' => $secret, 'base_url' => $mode === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com'];
+}
+
+/** @return array<string,mixed> */
+function paypal_request(string $method, string $path, ?array $payload = null): array
+{
+    if (!function_exists('curl_init')) throw new RuntimeException('El servidor no tiene habilitada la extensión cURL. Reinicia Apache después de configurar PHP.');
+    $config = paypal_config();
+    $tokenRequest = curl_init($config['base_url'] . '/v1/oauth2/token');
+    curl_setopt_array($tokenRequest, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => 'grant_type=client_credentials', CURLOPT_HTTPAUTH => CURLAUTH_BASIC, CURLOPT_USERPWD => $config['client_id'] . ':' . $config['secret'], CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_HTTPHEADER => ['Accept: application/json', 'Accept-Language: es_MX']]);
+    $tokenBody = curl_exec($tokenRequest); $tokenCode = (int) curl_getinfo($tokenRequest, CURLINFO_RESPONSE_CODE);
+    $tokenError = curl_error($tokenRequest);
+    curl_close($tokenRequest);
+    $token = json_decode((string) $tokenBody, true);
+    if ($tokenCode < 200 || $tokenCode >= 300 || empty($token['access_token'])) {
+        error_log('PayPal OAuth failed: HTTP ' . $tokenCode . ($tokenError !== '' ? '; cURL: ' . $tokenError : ''));
+        throw new RuntimeException('No fue posible autenticar la conexión con PayPal.');
+    }
+    $request = curl_init($config['base_url'] . $path);
+    $headers = ['Authorization: Bearer ' . $token['access_token'], 'Accept: application/json'];
+    // PayPal exige este encabezado también en POST sin cuerpo, como la captura de una orden.
+    if ($payload !== null || in_array($method, ['POST', 'PUT', 'PATCH'], true)) $headers[] = 'Content-Type: application/json';
+    curl_setopt_array($request, [CURLOPT_CUSTOMREQUEST => $method, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 25, CURLOPT_HTTPHEADER => $headers]);
+    if ($payload !== null) curl_setopt($request, CURLOPT_POSTFIELDS, json_encode($payload, JSON_THROW_ON_ERROR));
+    $body = curl_exec($request); $code = (int) curl_getinfo($request, CURLINFO_RESPONSE_CODE);
+    $requestError = curl_error($request);
+    curl_close($request);
+    $response = json_decode((string) $body, true);
+    if ($code < 200 || $code >= 300 || !is_array($response)) {
+        $paypalName = is_array($response) ? (string) ($response['name'] ?? 'UNKNOWN_ERROR') : 'INVALID_RESPONSE';
+        $debugId = is_array($response) ? (string) ($response['debug_id'] ?? '') : '';
+        $issue = is_array($response) ? (string) ($response['details'][0]['issue'] ?? '') : '';
+        error_log('PayPal API failed: HTTP ' . $code . '; name=' . $paypalName . '; issue=' . $issue . '; debug_id=' . $debugId . ($requestError !== '' ? '; cURL: ' . $requestError : ''));
+
+        if ($issue === 'INSTRUMENT_DECLINED') throw new RuntimeException('PAYPAL_INSTRUMENT_DECLINED');
+        throw new RuntimeException('PayPal rechazó la operación (' . $paypalName . ($issue !== '' ? ': ' . $issue : '') . ').' . ($debugId !== '' ? ' Referencia: ' . $debugId . '.' : ''));
+    }
+    return $response;
+}
+
 function is_executive_producer(): bool { return (int) ($_SESSION['role_id'] ?? 0) === 3; }
 function is_editorial_user(): bool { return in_array((int) ($_SESSION['role_id'] ?? 0), [2, 3, 4], true); }
 function is_editor(): bool { return (int) ($_SESSION['role_id'] ?? 0) === 4; }
@@ -173,7 +297,8 @@ function sideb_public_header(string $active): string
     ];
     $nav = '';
     foreach ($links as $key => [$label, $href]) $nav .= '<a class="nav-link' . ($active === $key ? ' is-active' : '') . '" href="' . $href . '">' . $navIcons[$key] . '<span>' . $label . '</span></a>';
-    return '<header class="site-header"><div class="container header-inner"><a class="brand" href="index.php" aria-label="SIDE B, inicio">SIDE B<span class="brand-dot">.</span></a><nav class="primary-nav" aria-label="Navegación principal">' . $nav . '</nav><div class="header-actions"><a class="icon-button" href="publicaciones.php" aria-label="Buscar publicaciones"><svg class="public-action-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m16 16 5 5"/></svg></a><a class="icon-button" href="perfil.php" aria-label="Mi perfil"><svg class="public-action-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M5 20c.5-4 2.8-6 7-6s6.5 2 7 6"/></svg></a><a class="icon-button cart-button" href="carrito.php" aria-label="Carrito"><svg class="public-action-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 4h2l2 11h10l2-8H6M9 20h.01M17 20h.01"/></svg></a></div><button class="menu-button" type="button" aria-label="Abrir menú"><span></span><span></span></button>' . logout_control() . '</div></header>';
+    $cartCount = cart_count_for_current_user();
+    return '<header class="site-header"><div class="container header-inner"><a class="brand" href="index.php" aria-label="SIDE B, inicio">SIDE B<span class="brand-dot">.</span></a><nav class="primary-nav" aria-label="Navegación principal">' . $nav . '</nav><div class="header-actions"><a class="icon-button" href="publicaciones.php" aria-label="Buscar publicaciones"><svg class="public-action-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m16 16 5 5"/></svg></a><a class="icon-button" href="perfil.php" aria-label="Mi perfil"><svg class="public-action-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M5 20c.5-4 2.8-6 7-6s6.5 2 7 6"/></svg></a><a class="icon-button cart-button" href="carrito.php" aria-label="Carrito"><svg class="public-action-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 4h2l2 11h10l2-8H6M9 20h.01M17 20h.01"/></svg><span class="cart-count">' . $cartCount . '</span></a></div><button class="menu-button" type="button" aria-label="Abrir menú"><span></span><span></span></button>' . logout_control() . '</div></header>';
 }
 
 $sidebPublicPages = ['index.php' => 'inicio', 'artistas.php' => 'artistas', 'artista.php' => 'artistas', 'tienda.php' => 'tienda', 'producto.php' => 'tienda', 'carrito.php' => 'tienda', 'publicaciones.php' => '', 'publicacion.php' => '', 'perfil.php' => '', 'guardados.php' => ''];
@@ -182,3 +307,13 @@ if (isset($sidebPublicPages[$sidebScript])) {
     $sidebActive = $sidebPublicPages[$sidebScript];
     ob_start(static fn(string $html): string => preg_replace('#<header class="site-header">.*?</header>#s', sideb_public_header($sidebActive), $html, 1) ?? $html);
 }
+
+function sideb_favicon_markup(): string
+{
+    return '<link rel="icon" href="assets/favicons/sideb_sf.png" type="image/png"><link rel="apple-touch-icon" href="assets/favicons/sideb_sf.png"><link rel="manifest" href="assets/favicons/site.webmanifest">';
+}
+
+ob_start(static function (string $html): string {
+    $html = preg_replace('#<link\\s+rel="(?:icon|apple-touch-icon|manifest)"[^>]*>\\s*#i', '', $html) ?? $html;
+    return str_ireplace('</head>', sideb_favicon_markup() . '</head>', $html);
+});

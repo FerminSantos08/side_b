@@ -1,6 +1,8 @@
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; background: var(--color-ivory); color: var(--color-ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
+body { min-height: 100vh; display: flex; flex-direction: column; margin: 0; background: var(--color-ivory); color: var(--color-ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
+body > main { flex: 1 0 auto; }
+body > .site-footer { flex-shrink: 0; }
 a { color: inherit; text-decoration: none; }
 button, a { -webkit-tap-highlight-color: transparent; }
 a:focus-visible, button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 4px; }

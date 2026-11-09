@@ -41,10 +41,8 @@ try {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="SIDE B: historias, lanzamientos, merch y una comunidad real alrededor de la cultura musical.">
   <title>SIDE B — Más que música</title>
-<link rel="icon" href="assets/favicons/favicon.ico" sizes="any">
-<link rel="icon" href="assets/favicons/favicon.svg" type="image/svg+xml">
-<link rel="icon" href="assets/favicons/favicon-96x96.png" type="image/png" sizes="96x96">
-<link rel="apple-touch-icon" href="assets/favicons/apple-touch-icon.png">
+<link rel="icon" href="assets/favicons/sideb_sf.png" type="image/png">
+<link rel="apple-touch-icon" href="assets/favicons/sideb_sf.png">
 <link rel="manifest" href="assets/favicons/site.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
