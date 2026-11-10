@@ -6,8 +6,7 @@ $post = null;
 $related = [];
 $comments = [];
 $loadError = null;
-$commentError = null;
-$commentMessage = null;
+$savedPost = false;
 
 if ($slug === '' || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug)) {
     http_response_code(404);
@@ -37,31 +36,6 @@ if ($slug === '' || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug)) {
             http_response_code(404);
             $loadError = 'La publicación que buscas no está disponible.';
         } else {
-            if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'comment') {
-                $comment = trim((string) ($_POST['comment'] ?? ''));
-                $commentLength = function_exists('mb_strlen') ? mb_strlen($comment) : strlen($comment);
-
-                if (!valid_csrf()) {
-                    $commentError = 'La sesión del formulario venció. Intenta de nuevo.';
-                } elseif (empty($_SESSION['user_id'])) {
-                    $commentError = 'Inicia sesión para publicar un comentario.';
-                } elseif ($commentLength < 1 || $commentLength > 500) {
-                    $commentError = 'El comentario debe tener entre 1 y 500 caracteres.';
-                } else {
-                    $commentStatement = db()->prepare(
-                        'INSERT INTO comentarios (comentario, usr_id, blog_id) VALUES (:comment, :user, :blog)'
-                    );
-                    $commentStatement->execute([
-                        'comment' => $comment,
-                        'user' => (int) $_SESSION['user_id'],
-                        'blog' => (int) $post['id_blog'],
-                    ]);
-                    flash('Tu comentario fue publicado.');
-                    redirect('publicacion.php?slug=' . rawurlencode($slug) . '#comentarios');
-                }
-            }
-
-            $commentMessage = flash();
             $relatedStatement = db()->prepare(
                 "SELECT b.titulo, b.img, b.tags, b.slug,
                         (SELECT GROUP_CONCAT(a.nombre ORDER BY a.nombre SEPARATOR ' / ')
@@ -79,7 +53,7 @@ if ($slug === '' || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug)) {
             $related = $relatedStatement->fetchAll();
 
             $commentsStatement = db()->prepare(
-                "SELECT c.id_com, c.comentario, c.fecha, COALESCE(p.alias, u.nom_usr) AS autor
+                "SELECT c.id_com, c.comentario, c.fecha, COALESCE(p.alias, u.nom_usr) AS autor, p.avatar_url
                  FROM comentarios AS c
                  INNER JOIN usuario AS u ON u.id_usr = c.usr_id
                  LEFT JOIN perfil_usuario AS p ON p.usr_id = u.id_usr
@@ -88,6 +62,12 @@ if ($slug === '' || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug)) {
             );
             $commentsStatement->execute(['blog' => $post['id_blog']]);
             $comments = $commentsStatement->fetchAll();
+
+            if (!empty($_SESSION['user_id'])) {
+                $savedStatement = db()->prepare('SELECT 1 FROM guardado_publicacion WHERE usr_id = :user AND blog_id = :blog');
+                $savedStatement->execute(['user' => (int) $_SESSION['user_id'], 'blog' => (int) $post['id_blog']]);
+                $savedPost = (bool) $savedStatement->fetchColumn();
+            }
         }
     } catch (Throwable) {
         $loadError = 'No fue posible cargar la publicación. Intenta de nuevo más tarde.';
@@ -120,7 +100,7 @@ $image = $post ? publication_image_url($post['img']) : null;
   <link rel="stylesheet" href="assets/css/home.css">
   <link rel="stylesheet" href="assets/css/posts.css">
   <link rel="stylesheet" href="assets/css/posts-dynamic.css">
-  <link rel="stylesheet" href="assets/css/post-detail.css?v=2">
+  <link rel="stylesheet" href="assets/css/post-detail.css?v=3">
 </head>
 <body>
   <a class="skip-link" href="#contenido">Saltar al contenido</a>
@@ -131,37 +111,35 @@ $image = $post ? publication_image_url($post['img']) : null;
     <?php else: ?>
       <section class="post-article container">
         <div class="detail-cover visual-surface visual-surface--portrait"><?php if ($image): ?><img src="<?= e($image) ?>" alt=""><span class="image-stamp"><?= e($editorialLabel) ?></span><?php endif; ?></div>
-        <header class="post-detail-header"><h1><?= e($post['titulo']) ?></h1><div class="post-detail-meta"><span class="post-category"><?= e($editorialKicker) ?></span><span>Por <?= e($post['autor']) ?> · <?= e($post['rol_autor']) ?></span><time datetime="<?= e($post['fecha_publicacion']) ?>"><?= e($date) ?></time><span><?= $readMinutes ?> min de lectura</span><?= logout_control() ?></div></header>
+        <header class="post-detail-header"><h1><?= e($post['titulo']) ?></h1><div class="post-detail-meta"><span class="post-category"><?= e($editorialKicker) ?></span><span>Por <?= e($post['autor']) ?> · <?= e($post['rol_autor']) ?></span><time datetime="<?= e($post['fecha_publicacion']) ?>"><?= e($date) ?></time><span><?= $readMinutes ?> min de lectura</span></div></header>
         <div class="article-reading-layout">
           <!-- El HTML fue filtrado por clean_editorial_html() antes de persistirse. -->
           <article class="detail-copy"><?= $post['contenido'] ?></article>
-          <aside class="interaction-panel" aria-label="Interacción de la publicación">
-            <section class="interaction-section">
-              <p class="eyebrow">Interacción</p>
-              <h2>Participa</h2>
-              <p class="interaction-pending">Las reacciones estarán disponibles próximamente.</p>
-              <p class="interaction-pending">Guardar publicaciones requiere soporte de datos adicional.</p>
-              <a class="text-link" href="publicaciones.php">Volver a publicaciones <span aria-hidden="true">↗</span></a>
+          <aside class="interaction-panel" aria-label="Herramientas de la publicación">
+            <section class="library-card" aria-labelledby="library-title">
+              <p class="eyebrow">Tu biblioteca</p>
+              <h2 id="library-title">Guarda para después</h2>
+              <p class="library-description">Una buena historia merece volver a escucharse.</p>
+              <?php if (!empty($_SESSION['user_id'])): ?>
+                <form class="save-form" method="post" action="guardados.php">
+                  <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                  <input type="hidden" name="action" value="toggle_post">
+                  <input type="hidden" name="post_id" value="<?= (int) $post['id_blog'] ?>">
+                  <input type="hidden" name="return_url" value="publicacion.php?slug=<?= rawurlencode($slug) ?>">
+                  <button class="save-article-button<?= $savedPost ? ' is-saved' : '' ?>" type="submit" aria-label="<?= $savedPost ? 'Quitar publicación de guardados' : 'Guardar publicación' ?>"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3.75A1.75 1.75 0 0 1 7.75 2h8.5A1.75 1.75 0 0 1 18 3.75V22l-6-3.75L6 22V3.75Z"/></svg><span><?= $savedPost ? 'Guardado' : 'Guardar artículo' ?></span></button>
+                </form>
+              <?php else: ?>
+                <p class="library-login"><a href="login.php">Inicia sesión</a> para guardar este artículo.</p>
+              <?php endif; ?>
             </section>
             <section class="comments-section" id="comentarios" aria-labelledby="comments-title">
               <div class="comments-heading"><h2 id="comments-title">Comentarios</h2><span><?= count($comments) ?></span></div>
-              <?php if ($commentMessage): ?><p class="comment-feedback is-success" aria-live="polite"><?= e($commentMessage) ?></p><?php endif; ?>
-              <?php if ($commentError): ?><p class="comment-feedback" aria-live="polite"><?= e($commentError) ?></p><?php endif; ?>
-              <?php if (!empty($_SESSION['user_id'])): ?>
-                <form class="comment-form" method="post" action="publicacion.php?slug=<?= rawurlencode($slug) ?>#comentarios">
-                  <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-                  <input type="hidden" name="action" value="comment">
-                  <label for="comment">Comparte tu idea</label>
-                  <textarea id="comment" name="comment" maxlength="500" required placeholder="Escribe un comentario…"></textarea>
-                  <button class="button button-primary" type="submit">Publicar comentario</button>
-                </form>
-              <?php else: ?>
-                <p class="comment-login">Inicia sesión para participar. <a href="login.php">Entrar</a></p>
-              <?php endif; ?>
+              <p class="mobile-availability"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="1.8"/><path d="M10.5 18.5h3"/></svg><span>Participa en la conversación desde la app móvil.</span></p>
               <div class="comments-list">
-                <?php if (!$comments): ?><p class="comments-empty">Todavía no hay comentarios. Sé la primera persona en participar.</p><?php endif; ?>
+                <?php if (!$comments): ?><p class="comments-empty">Todavía no hay comentarios.</p><?php endif; ?>
                 <?php foreach ($comments as $comment): ?>
-                  <article class="comment-item"><header><strong><?= e($comment['autor']) ?></strong><time datetime="<?= e($comment['fecha']) ?>"><?= e(date('d/m/Y H:i', strtotime($comment['fecha']))) ?></time></header><p><?= nl2br(e($comment['comentario'])) ?></p></article>
+                  <?php $commentInitial = function_exists('mb_substr') ? mb_strtoupper(mb_substr($comment['autor'], 0, 1, 'UTF-8'), 'UTF-8') : strtoupper(substr($comment['autor'], 0, 1)); ?>
+                  <article class="comment-item"><div class="comment-avatar" aria-hidden="true"><?php if ($comment['avatar_url']): ?><img src="<?= e($comment['avatar_url']) ?>" alt=""><?php else: ?><?= e($commentInitial) ?><?php endif; ?></div><div class="comment-body"><header><strong><?= e($comment['autor']) ?></strong><time datetime="<?= e($comment['fecha']) ?>"><?= e(date('d/m/Y · H:i', strtotime($comment['fecha']))) ?></time></header><p><?= nl2br(e($comment['comentario'])) ?></p></div></article>
                 <?php endforeach; ?>
               </div>
             </section>

@@ -35,6 +35,17 @@ CREATE TABLE IF NOT EXISTS `perfil_usuario` (
     CONSTRAINT `fk_perfil_usuario` FOREIGN KEY (`usr_id`) REFERENCES `usuario` (`id_usr`) ON DELETE CASCADE
 ) ENGINE = InnoDB;
 
+CREATE TABLE IF NOT EXISTS `direccion_usuario` (
+    `id_direccion` INT AUTO_INCREMENT PRIMARY KEY,
+    `usr_id` INT NOT NULL,
+    `etiqueta` VARCHAR(60) NOT NULL DEFAULT 'Casa',
+    `direccion` VARCHAR(255) NOT NULL,
+    `es_principal` BOOLEAN NOT NULL DEFAULT FALSE,
+    `fecha_creacion` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY `idx_direccion_usuario` (`usr_id`,`es_principal`),
+    CONSTRAINT `fk_direccion_usuario` FOREIGN KEY (`usr_id`) REFERENCES `usuario` (`id_usr`) ON DELETE CASCADE
+) ENGINE = InnoDB;
+
 CREATE TABLE IF NOT EXISTS `blog` (
     `id_blog` INT AUTO_INCREMENT PRIMARY KEY,
     `titulo` VARCHAR(200) NOT NULL,
@@ -72,6 +83,18 @@ CREATE TABLE IF NOT EXISTS `comentarios` (
     CONSTRAINT `fk_comentarios_usuario` FOREIGN KEY (`usr_id`) REFERENCES `usuario` (`id_usr`) ON DELETE RESTRICT,
     CONSTRAINT `fk_comentarios_blog` FOREIGN KEY (`blog_id`) REFERENCES `blog` (`id_blog`) ON DELETE RESTRICT,
     CONSTRAINT `chk_comentarios_no_vacio` CHECK (CHAR_LENGTH(TRIM(`comentario`)) > 0)
+) ENGINE = InnoDB;
+
+-- Guardados de publicaciones para la biblioteca web y móvil.
+CREATE TABLE IF NOT EXISTS `guardado_publicacion` (
+    `id_guardado_publicacion` INT AUTO_INCREMENT PRIMARY KEY,
+    `usr_id` INT NOT NULL,
+    `blog_id` INT NOT NULL,
+    `fecha_guardado` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uq_guardado_publicacion_usuario_blog` (`usr_id`,`blog_id`),
+    KEY `idx_guardado_publicacion_blog` (`blog_id`),
+    CONSTRAINT `fk_guardado_publicacion_usuario` FOREIGN KEY (`usr_id`) REFERENCES `usuario` (`id_usr`) ON DELETE CASCADE,
+    CONSTRAINT `fk_guardado_publicacion_blog` FOREIGN KEY (`blog_id`) REFERENCES `blog` (`id_blog`) ON DELETE CASCADE
 ) ENGINE = InnoDB;
 
 CREATE TABLE IF NOT EXISTS `artista` (

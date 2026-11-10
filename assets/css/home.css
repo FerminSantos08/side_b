@@ -7,11 +7,12 @@
 .hero-note { align-items: center; color: var(--color-muted); display: flex; font-size: 10px; gap: .7rem; letter-spacing: .06em; margin-top: 4rem; text-transform: uppercase; }
 .note-line { background: var(--color-terracotta); display: block; height: 1px; width: 44px; }
 .hero-art { background: var(--color-terracotta); min-height: 440px; }
+.hero-art[role="link"] { cursor: pointer; }
 .hero-art::before { border: 1px solid rgba(234,227,214,.5); content: ""; inset: 17px; position: absolute; z-index: 0; }
 .hero-art-label, .hero-art-caption { color: var(--color-ivory); font-size: 10px; letter-spacing: .12em; position: absolute; text-transform: uppercase; z-index: 1; }
 .hero-art-label { left: 34px; top: 32px; }
 .hero-art-caption { bottom: 29px; left: 34px; }
-.hero-art-title { color: var(--color-ivory); font-family: var(--font-display); font-size: clamp(5rem, 10vw, 10rem); line-height: .7; position: absolute; right: 7%; text-align: right; top: 24%; z-index: 1; }
+.hero-art-title { color: var(--color-ivory); font-family: var(--font-display); font-size: clamp(3.4rem, 5.3vw, 6.2rem); line-height: .82; max-height: 3.3em; max-width: 86%; overflow: hidden; position: absolute; right: 7%; text-align: right; top: 24%; z-index: 1; }
 .hero-art-circle { border: 1px solid var(--color-ivory); border-radius: 50%; height: 40%; opacity: .9; position: absolute; right: 18%; top: 21%; width: 40%; }
 .hero-art-circle::after { border: 1px solid var(--color-ivory); border-radius: 50%; content: ""; inset: 22%; position: absolute; }
 .editorial-grid { display: grid; gap: 1.4rem; grid-template-columns: 1.35fr 1fr 1fr; }
@@ -33,6 +34,7 @@
 .discovery-intro > p:not(.eyebrow) { color: rgba(234,227,214,.65); font-size: 15px; max-width: 310px; }
 .discovery-intro .button { margin-top: 1.5rem; }
 .artist-feature { aspect-ratio: 1.25 / 1; background: linear-gradient(135deg, #858c77 0%, #b8ac8b 45%, #a96f58 100%); }
+.artist-feature > img { height: 100%; object-fit: contain; position: absolute; width: 100%; }
 .artist-feature::before { border: 1px solid rgba(234,227,214,.7); border-radius: 50%; content: ""; height: 76%; left: 17%; position: absolute; top: 9%; transform: rotate(-18deg); width: 62%; }
 .artist-feature::after { background: rgba(41,42,39,.45); clip-path: polygon(50% 0, 100% 100%, 0 100%); inset: 10% 12% 0 28%; opacity: .7; }
 .artist-feature-top { display: flex; font-size: 10px; justify-content: space-between; letter-spacing: .12em; padding: 24px; position: relative; z-index: 1; }

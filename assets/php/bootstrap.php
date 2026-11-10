@@ -117,6 +117,11 @@ function upload_backstage_image(array $file, string $folder, ?string $previous =
     return 'uploads/' . $folder . '/' . $filename;
 }
 
+function upload_profile_avatar(array $file, ?string $previous = null): ?string
+{
+    return upload_backstage_image($file, 'perfiles', $previous);
+}
+
 function redirect(string $path): never { header('Location: ' . $path); exit; }
 function csrf_token(): string { return $_SESSION['csrf_token'] ??= bin2hex(random_bytes(32)); }
 function valid_csrf(): bool { return isset($_POST['csrf_token']) && hash_equals($_SESSION['csrf_token'] ?? '', (string) $_POST['csrf_token']); }

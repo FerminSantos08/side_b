@@ -27,12 +27,17 @@ try {
 }
 $shopProducts = [];
 $shopCategories = [];
+$featuredArtist = null;
 try {
     $shopProducts = db()->query('SELECT p.nombre,p.slug,p.precio,p.imagen,c.nombre categoria FROM producto p INNER JOIN categoria_producto c ON c.id_categoria=p.categoria_id WHERE p.activo=TRUE AND p.stock>0 AND p.slug IS NOT NULL ORDER BY p.fecha_actualizacion DESC LIMIT 3')->fetchAll();
     $shopCategories = db()->query('SELECT c.nombre,COUNT(p.id_producto) total FROM categoria_producto c INNER JOIN producto p ON p.categoria_id=c.id_categoria WHERE p.activo=TRUE AND p.stock>0 GROUP BY c.id_categoria,c.nombre ORDER BY c.nombre')->fetchAll();
+    $featuredArtist = db()->query('SELECT id_artista,nombre,biografia,imagen,genero FROM artista WHERE activo=TRUE ORDER BY RAND() LIMIT 1')->fetch();
 } catch (Throwable) {
     // La portada continúa disponible si el catálogo falla.
 }
+$heroSelections = [];
+foreach ($featuredPosts as $item) $heroSelections[] = ['label' => 'Lectura recomendada', 'title' => $item['titulo'], 'caption' => 'SIDE B / Editorial', 'image' => publication_image_url($item['img']), 'url' => 'publicacion.php?slug=' . rawurlencode($item['slug'])];
+if ($featuredArtist) $heroSelections[] = ['label' => 'Artista destacado', 'title' => $featuredArtist['nombre'], 'caption' => $featuredArtist['genero'] ?: 'SIDE B recomienda', 'image' => $featuredArtist['imagen'], 'url' => 'artista.php?artista=' . rawurlencode(artist_slug($featuredArtist['nombre']))];
 ?>
 <!doctype html>
 <html lang="es">
@@ -71,7 +76,7 @@ try {
       <div class="hero-copy">
         <p class="eyebrow">Cultura musical independiente</p>
         <h1 id="hero-title">Más que<br><em>música.</em></h1>
-        <p class="hero-description">Historias, lanzamientos, merch y una comunidad real para quienes quieren escuchar un poco más allá.</p>
+        <p class="hero-description">Historias, artistas y objetos para seguir escuchando distinto.</p>
         <div class="button-group">
           <a class="button button-primary" href="#destacados">Explorar contenido <span aria-hidden="true">↗</span></a>
           <a class="button button-secondary" href="artistas.php">Descubrir artistas</a>
@@ -125,7 +130,7 @@ try {
     <section class="discovery-section" id="artistas" aria-labelledby="discovery-title">
       <div class="container discovery-inner">
         <div class="discovery-intro"><p class="eyebrow">Nuevas coordenadas</p><h2 id="discovery-title">Descubre<br><em>algo distinto.</em></h2><p>Artistas que están haciendo ruido en los márgenes. Sin algoritmos, con criterio.</p><a class="button button-light" href="artistas.php">Explorar artistas <span aria-hidden="true">↗</span></a></div>
-        <div class="artist-feature visual-surface visual-surface--artist"><div class="artist-feature-top"><span>ARTISTA DESTACADO</span><span>01 / 03</span></div><div class="artist-feature-info"><p>Desde Guadalajara</p><h3>La Niebla</h3><a href="#la-niebla" class="circle-arrow" aria-label="Ver perfil de La Niebla">↗</a></div></div>
+        <?php if($featuredArtist):?><div class="artist-feature visual-surface visual-surface--artist"><?php if($featuredArtist['imagen']):?><img src="<?=e($featuredArtist['imagen'])?>" alt=""><?php endif;?><div class="artist-feature-top"><span>ARTISTA DESTACADO</span><span>01 / 01</span></div><div class="artist-feature-info"><p><?=e($featuredArtist['genero']?:'SIDE B recomienda')?></p><h3><?=e($featuredArtist['nombre'])?></h3><a href="artista.php?artista=<?=rawurlencode(artist_slug($featuredArtist['nombre']))?>" class="circle-arrow" aria-label="Ver perfil de <?=e($featuredArtist['nombre'])?>">↗</a></div></div><?php else:?><div class="artist-feature visual-surface visual-surface--artist"><div class="artist-feature-top"><span>ARTISTA DESTACADO</span></div><div class="artist-feature-info"><p>Próximamente</p><h3>Nuevas voces</h3></div></div><?php endif;?>
       </div>
     </section>
 
@@ -142,6 +147,25 @@ try {
   </main>
 
   <?= sideb_footer() ?>
+  <script>
+    const heroSelections = <?= json_encode($heroSelections, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    const heroArt = document.querySelector('.hero-art');
+    if (heroArt && heroSelections.length) {
+      const selection = heroSelections[Math.floor(Math.random() * heroSelections.length)];
+      const label = heroArt.querySelector('.hero-art-label');
+      const title = heroArt.querySelector('.hero-art-title');
+      const caption = heroArt.querySelector('.hero-art-caption');
+      if (label) label.textContent = selection.label;
+      if (title) title.textContent = selection.title.length > 34 ? selection.title.slice(0, 34).trimEnd() + '…' : selection.title;
+      if (caption) caption.textContent = selection.caption;
+      if (selection.image) heroArt.style.background = `center / cover no-repeat url("${selection.image}")`;
+      heroArt.setAttribute('aria-label', selection.label + ': ' + selection.title);
+      heroArt.addEventListener('click', () => { window.location.href = selection.url; });
+      heroArt.tabIndex = 0;
+      heroArt.setAttribute('role', 'link');
+      heroArt.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); window.location.href = selection.url; } });
+    }
+  </script>
 </body>
 </html>
 
