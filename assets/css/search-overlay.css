@@ -1,0 +1,159 @@
+.public-header:has(.search-dropdown:not([hidden])) {
+  position: relative;
+  z-index: 20;
+}
+
+.public-header [data-search-open][aria-expanded="true"] {
+  background: var(--color-panel);
+  border-radius: var(--radius-control);
+}
+
+.search-dropdown { padding-bottom: .75rem; }
+
+.search-dropdown-form {
+  max-width: 56rem;
+  position: relative;
+}
+
+.search-dropdown-field { position: relative; }
+
+.search-dropdown-field input {
+  background: var(--color-paper);
+  border-radius: var(--radius-panel);
+  min-height: 3.4rem;
+  padding-inline: 3rem;
+}
+
+.search-dropdown-submit,
+.search-dropdown-close {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  cursor: pointer;
+  display: flex;
+  inset-block: 3px;
+  justify-content: center;
+  min-width: var(--control-height);
+  padding: .55rem;
+  position: absolute;
+}
+
+.search-dropdown-submit { inset-inline-start: 3px; }
+.search-dropdown-close { inset-inline-end: 3px; }
+.search-dropdown-submit:hover,
+.search-dropdown-close:hover { background: var(--color-panel); }
+.search-dropdown-submit:focus-visible,
+.search-dropdown-close:focus-visible { outline-offset: -2px; }
+
+.search-dropdown-field svg {
+  fill: none;
+  height: 1.15rem;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.8;
+  width: 1.15rem;
+}
+
+.search-dropdown-panel {
+  background: var(--color-ivory);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  box-shadow: 0 10px 24px rgba(41, 42, 39, .12);
+  inset: calc(100% + .35rem) 0 auto;
+  position: absolute;
+}
+
+.search-dropdown-status {
+  color: var(--color-muted);
+  font-size: var(--text-small);
+  margin: 0;
+  padding: .65rem .85rem;
+}
+
+.search-dropdown-results {
+  max-height: min(31rem, 55vh);
+  max-height: min(31rem, 55dvh);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: 0 .5rem .4rem;
+}
+
+.search-dropdown-results:empty { display: none; }
+
+.search-dropdown-group {
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  gap: .5rem;
+  justify-content: space-between;
+  margin: 0 .35rem;
+  min-height: 2rem;
+}
+.search-dropdown-group h3 { color: var(--color-accent-ink); }
+.search-dropdown-group a {
+  font-size: .78rem;
+  font-weight: 600;
+  padding: .25rem 0;
+  text-decoration: underline;
+  text-underline-offset: .18em;
+}
+
+.search-dropdown-results ul { list-style: none; margin: .2rem 0; padding: 0; }
+
+.search-dropdown-item {
+  align-items: center;
+  border-radius: var(--radius-control);
+  display: flex;
+  gap: .8rem;
+  min-height: var(--control-height);
+  padding: .4rem .45rem;
+  transition: background var(--transition-ui);
+}
+.search-dropdown-item:hover,
+.search-dropdown-item:focus-visible { background: var(--color-panel); }
+.search-dropdown-item:focus-visible { outline-offset: -2px; }
+
+.search-dropdown-item img {
+  background: var(--color-surface);
+  border-radius: .35rem;
+  flex: 0 0 auto;
+  height: 3.25rem;
+  object-fit: cover;
+  width: 3.25rem;
+}
+
+.search-dropdown-item > span {
+  display: grid;
+  gap: .1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.search-dropdown-item small,
+.search-dropdown-item span > span { color: var(--color-muted); font-size: .875rem; line-height: 1.35; }
+.search-dropdown-item strong { font: 400 1.4rem/1.08 var(--font-display); }
+
+.search-dropdown-all {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-ink);
+  cursor: pointer;
+  font: 700 var(--text-small) var(--font-ui);
+  min-height: var(--control-height);
+  padding: .5rem .85rem;
+  text-align: start;
+  width: 100%;
+}
+.search-dropdown-all:hover { color: var(--color-accent-ink); }
+.search-dropdown-all:focus-visible { outline-offset: -4px; }
+
+@media (max-width: 540px) {
+  .search-dropdown-form { width: calc(100% - 1.5rem); }
+  .search-dropdown-results { max-height: min(22rem, 46dvh); }
+  .search-dropdown-field input { font-size: 1rem; }
+  .search-dropdown-item img { height: 2.75rem; width: 2.75rem; }
+  .search-dropdown-item strong { font-size: 1.25rem; }
+}

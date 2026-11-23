@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/assets/php/bootstrap.php';
+require_once __DIR__ . '/assets/php/auth_layout.php';
 
 if (!empty($_SESSION['user_id'])) redirect(in_array((int) ($_SESSION['role_id'] ?? 0), [3, 4], true) ? 'backstage.php' : 'index.php');
 
@@ -50,32 +51,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <link rel="icon" href="assets/favicons/sideb_sf.png" type="image/png">
 <link rel="apple-touch-icon" href="assets/favicons/sideb_sf.png">
 <link rel="manifest" href="assets/favicons/site.webmanifest">
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/variables.css"><link rel="stylesheet" href="assets/css/global.css"><link rel="stylesheet" href="assets/css/components.css"><link rel="stylesheet" href="assets/css/auth.css">
+  <link rel="stylesheet" href="assets/css/variables.css?v=20261120-7"><link rel="stylesheet" href="assets/css/global.css?v=20261118"><link rel="stylesheet" href="assets/css/components.css?v=20261118"><link rel="stylesheet" href="assets/css/auth.css?v=20261119-3">
 </head>
-<body>
-  <main class="auth-page">
-    <aside class="auth-aside"><a class="auth-brand" href="index.php" aria-label="SIDE B, inicio">SIDE B<span>.</span></a><div class="auth-art-copy"><p class="eyebrow">Una comunidad con curiosidad</p><h1>Únete al<br><em>otro lado.</em></h1><p>Guarda lo que te mueve, comparte tus hallazgos y escucha con otras personas.</p></div><p class="auth-mark">Música · Cultura · Comunidad</p></aside>
+<body class="auth-body">
+  <?php sideb_auth_header(); ?>
+  <main id="contenido" class="auth-page auth-page--register">
     <section class="auth-main" aria-labelledby="register-title"><div class="auth-card">
-      <header class="auth-card-header"><p class="eyebrow">Empieza tu recorrido</p><h2 id="register-title">Crea tu cuenta</h2><p>Forma parte de una comunidad que escucha con curiosidad.</p></header>
+      <header class="auth-card-header"><p class="eyebrow">Empieza tu recorrido</p><h1 id="register-title">Crea tu cuenta</h1><p>Forma parte de una comunidad que escucha con curiosidad.</p></header>
       <form class="auth-form" method="post" novalidate>
-        <?php if ($error): ?><p class="form-feedback is-visible" aria-live="polite"><?= e($error) ?></p><?php endif; ?>
+        <?php if ($error): ?><p class="auth-feedback" data-state="error" role="alert"><?= e($error) ?></p><?php endif; ?>
         <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-        <div class="form-field"><label for="register-name">Nombre de usuario</label><input id="register-name" name="username" type="text" autocomplete="username" placeholder="tu_nombre" required></div>
-        <div class="form-field"><label for="register-email">Correo electrónico</label><input id="register-email" name="email" type="email" autocomplete="email" placeholder="tu@correo.com" required></div>
-        <div class="form-field"><label for="register-password">Contraseña</label><input id="register-password" name="password" type="password" autocomplete="new-password" placeholder="••••••••" minlength="8" required></div>
-        <p class="password-note">Usa al menos 8 caracteres.</p>
-        <div class="form-field"><label for="register-confirm">Confirmar contraseña</label><input id="register-confirm" name="password_confirmation" type="password" autocomplete="new-password" placeholder="••••••••" minlength="8" required></div>
+        <div class="form-field"><label for="register-name">Nombre de usuario</label><input id="register-name" name="username" type="text" autocomplete="username" placeholder="tu_nombre" value="<?= e($username ?? '') ?>" required></div>
+        <div class="form-field"><label for="register-email">Correo electrónico</label><input id="register-email" name="email" type="email" autocomplete="email" placeholder="tu@correo.com" value="<?= e(is_string($_POST['email'] ?? null) ? $_POST['email'] : '') ?>" required></div>
+        <?php sideb_auth_password('register-password', 'password', 'Contraseña', 'new-password', 'Usa al menos 8 caracteres.'); ?>
+        <?php sideb_auth_password('register-confirm', 'password_confirmation', 'Confirmar contraseña', 'new-password', 'Repite tu contraseña.'); ?>
         <label class="checkbox-control"><input type="checkbox" name="terms" required> Acepto los términos y condiciones</label>
-        <button class="auth-submit" type="submit">Crear cuenta <span aria-hidden="true">↗</span></button>
-      <p class="form-feedback" data-form-feedback aria-live="polite"></p></form><p class="auth-switch">¿Ya tienes cuenta? <a class="auth-link" href="login.php">Inicia sesión</a></p>
+        <button class="button button-primary auth-submit" type="submit">Crear cuenta <span aria-hidden="true">↗</span></button>
+      </form>
+      <p class="auth-switch">¿Ya tienes cuenta? <a class="auth-link" href="login.php">Inicia sesión</a></p>
     </div></section>
+    <aside class="auth-aside"><div class="auth-art-copy"><p class="eyebrow">Una comunidad con curiosidad</p><h2>Únete al<br><em>otro lado.</em></h2><p>Guarda lo que te mueve, comparte tus hallazgos y escucha con otras personas.</p></div><p class="auth-mark">Música · Cultura · Comunidad</p></aside>
   </main>
-<?= sideb_footer() ?>
+<?php sideb_auth_footer(); ?>
+<script src="assets/js/auth.js?v=20261119-2" defer></script>
 </body>
 </html>
-
-
-
-

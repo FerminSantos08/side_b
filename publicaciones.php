@@ -25,7 +25,12 @@ try {
     $loadError = 'No fue posible cargar las publicaciones. Intenta de nuevo más tarde.';
 }
 
-$surfaces = ['visual-surface--portrait', 'visual-surface--warm', 'visual-surface--olive'];
+$leadPost = array_shift($posts);
+$coverUrl = static function (?string $filename): ?string {
+    $url = publication_image_url($filename);
+    return $url !== null && is_file(__DIR__ . '/uploads/publicaciones/' . $filename) ? $url : null;
+};
+$leadImage = $leadPost ? $coverUrl($leadPost['img']) : null;
 ?>
 <!doctype html>
 <html lang="es">
@@ -37,66 +42,78 @@ $surfaces = ['visual-surface--portrait', 'visual-surface--warm', 'visual-surface
   <link rel="icon" href="assets/favicons/sideb_sf.png" type="image/png">
   <link rel="apple-touch-icon" href="assets/favicons/sideb_sf.png">
   <link rel="manifest" href="assets/favicons/site.webmanifest">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/variables.css">
-  <link rel="stylesheet" href="assets/css/global.css">
-  <link rel="stylesheet" href="assets/css/components.css">
-  <link rel="stylesheet" href="assets/css/home.css">
-  <link rel="stylesheet" href="assets/css/posts.css">
-  <link rel="stylesheet" href="assets/css/posts-dynamic.css">
+  <link rel="stylesheet" href="assets/css/variables.css?v=20261120-7">
+  <link rel="stylesheet" href="assets/css/global.css?v=20261118">
+  <link rel="stylesheet" href="assets/css/components.css?v=20261118">
+  <link rel="stylesheet" href="assets/css/home.css?v=20261119">
+  <link rel="stylesheet" href="assets/css/posts.css?v=20261119">
+  <link rel="stylesheet" href="assets/css/posts-dynamic.css?v=20261118">
 </head>
 <body>
   <a class="skip-link" href="#contenido">Saltar al contenido</a>
-  <header class="site-header">
-    <div class="container header-inner">
-      <a class="brand" href="index.php">SIDE B<span class="brand-dot">.</span></a>
-      <nav class="primary-nav" aria-label="Navegación principal">
-        <a class="nav-link" href="index.php">Inicio</a><a class="nav-link" href="artistas.php">Artistas</a><a class="nav-link" href="#comunidad">Comunidad</a><a class="nav-link" href="tienda.php">Tienda</a>
-      </nav>
-      <div class="header-actions">
-        <a class="icon-button" href="#buscar" aria-label="Buscar"><span class="icon icon-search"></span></a>
-        <a class="icon-button" href="perfil.php" aria-label="Mi perfil"><span class="icon icon-user"></span></a>
-        <a class="icon-button cart-button" href="carrito.php" aria-label="Carrito"><span class="icon icon-bag"></span><span class="cart-count">0</span></a>
+  <?php echo sideb_public_header('publicaciones'); ?>
+  <main id="contenido" class="publication-index">
+    <section class="home-lead container" aria-labelledby="publications-title">
+      <div class="home-lead-copy">
+        <p class="eyebrow">Historias para escuchar distinto</p>
+        <h1 id="publications-title">Publicaciones<br><em>y hallazgos.</em></h1>
+        <p class="hero-description">Entrevistas, contexto y selecciones para mirar la música desde otro lugar.</p>
+        <?php if ($posts): ?>
+          <div class="button-group"><a class="button button-primary" href="#archivo">Explorar publicaciones <span aria-hidden="true">↓</span></a></div>
+        <?php endif; ?>
       </div>
-      <button class="menu-button" type="button" aria-label="Abrir menú"><span></span><span></span></button>
-    <?= logout_control() ?></div></header>
-  <main id="contenido">
-    <section class="posts-hero container"><p class="eyebrow">Historias para escuchar distinto</p><h1>Publicaciones<br><em>y hallazgos.</em></h1><p>Entrevistas, contexto y selecciones para mirar la música desde otro lugar.</p></section>
-    <section class="container">
-      <nav class="category-tabs" aria-label="Filtrar publicaciones"><a class="is-active" href="publicaciones.php">Todos</a></nav>
-      <?php if ($loadError): ?>
-        <p class="profile-note"><?= e($loadError) ?></p>
-      <?php elseif (!$posts): ?>
-        <p class="profile-note">Aún no hay publicaciones disponibles.</p>
-      <?php else: ?>
+      <?php if ($leadPost): ?>
+        <a class="home-feature" href="publicacion.php?slug=<?= rawurlencode($leadPost['slug']) ?>">
+          <?php if ($leadImage): ?><img class="home-feature-image" src="<?= e($leadImage) ?>" alt="" fetchpriority="high"><?php endif; ?>
+          <div class="home-feature-caption">
+            <div>
+              <p class="eyebrow">Última publicación</p>
+              <h2><?= e($leadPost['titulo']) ?></h2>
+              <?php if (!empty($leadPost['desc'])): ?><p class="home-feature-meta"><?= e($leadPost['desc']) ?></p><?php endif; ?>
+              <div class="card-meta">
+                <span>Por <?= e($leadPost['autor']) ?> · <?= e($leadPost['rol_autor']) ?></span>
+                <time datetime="<?= e($leadPost['fecha_publicacion']) ?>"><?= e(date('d/m/Y', strtotime($leadPost['fecha_publicacion']))) ?></time>
+              </div>
+            </div>
+            <span class="home-feature-arrow" aria-hidden="true">↗</span>
+          </div>
+        </a>
+      <?php endif; ?>
+    </section>
+
+    <?php if ($loadError || !$leadPost): ?>
+      <section class="container publication-index-empty">
+        <p class="profile-note"><?= e($loadError ?? 'Aún no hay publicaciones disponibles.') ?></p>
+      </section>
+    <?php elseif ($posts): ?>
+      <section class="container publication-archive" id="archivo" aria-labelledby="archive-title">
+        <div class="section-heading"><h2 id="archive-title">Archivo editorial</h2></div>
         <div class="posts-grid">
-          <?php foreach ($posts as $index => $post): ?>
+          <?php foreach ($posts as $post): ?>
             <?php
-              $editorialLabel = publication_editorial_label($post['artista_nombre'] ?? null);
               $editorialKicker = publication_editorial_kicker($post['artista_nombre'] ?? null);
               $date = date('d/m/Y', strtotime($post['fecha_publicacion']));
               $excerpt = (string) ($post['desc'] ?? '');
-              $image = publication_image_url($post['img']);
+              $image = $coverUrl($post['img']);
+              $url = 'publicacion.php?slug=' . rawurlencode($post['slug']);
             ?>
-            <article class="story-card <?= $index === 0 ? 'story-card--featured' : '' ?>">
-              <a class="story-image visual-surface <?= e($surfaces[$index % count($surfaces)]) ?>" href="publicacion.php?slug=<?= rawurlencode($post['slug']) ?>" aria-label="Leer <?= e($post['titulo']) ?>">
-                <?php if ($image): ?><img src="<?= e($image) ?>" alt=""><?php endif; ?>
-                <?php if ($index === 0): ?><span class="image-stamp"><?= e($editorialLabel) ?></span><?php endif; ?>
-                <span class="image-number"><?= str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT) ?></span>
-              </a>
+            <article class="story-card">
+              <?php if ($image): ?>
+                <a class="story-image visual-surface" href="<?= e($url) ?>" aria-label="Leer <?= e($post['titulo']) ?>">
+                  <img src="<?= e($image) ?>" alt="" loading="lazy">
+                </a>
+              <?php endif; ?>
               <div class="story-content">
                 <p class="card-kicker"><?= e($editorialKicker) ?></p>
-                <?php if ($index === 0): ?><h2><?php else: ?><h3><?php endif; ?><a href="publicacion.php?slug=<?= rawurlencode($post['slug']) ?>"><?= e($post['titulo']) ?></a><?php if ($index === 0): ?></h2><?php else: ?></h3><?php endif; ?>
+                <h3><a href="<?= e($url) ?>"><?= e($post['titulo']) ?></a></h3>
                 <?php if ($excerpt !== ''): ?><p class="card-excerpt"><?= e($excerpt) ?></p><?php endif; ?>
                 <div class="card-meta"><span>Por <?= e($post['autor']) ?> · <?= e($post['rol_autor']) ?></span><time datetime="<?= e($post['fecha_publicacion']) ?>"><?= e($date) ?></time></div>
               </div>
             </article>
           <?php endforeach; ?>
         </div>
-      <?php endif; ?>
-    </section>
+      </section>
+    <?php endif; ?>
   </main>
   <?= sideb_footer() ?>
 </body>

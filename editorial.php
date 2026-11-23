@@ -2,12 +2,6 @@
 require_once __DIR__ . '/assets/php/editorial.php';
 require_editorial_user();
 
-// Editorial conserva su contenido propio, pero usa la misma cabecera administrativa.
-$adminHeader = '<header class="site-header"><div class="container header-inner"><a class="brand" href="index.php">SIDE B<span class="brand-dot">.</span></a><nav class="primary-nav" aria-label="Módulos administrativos"></nav>' . logout_control() . '</div></header>';
-ob_start(static function (string $html) use ($adminHeader): string {
-    return preg_replace('#<header class="site-header">.*?</header>#s', $adminHeader, $html, 1) ?? $html;
-});
-
 $database = db();
 $isExecutive = is_executive_producer();
 $mode = in_array($_GET['view'] ?? '', ['new', 'edit'], true) ? $_GET['view'] : 'list';
@@ -63,9 +57,30 @@ if ($mode === 'edit') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!valid_csrf()) $error = 'La sesión del formulario venció. Intenta de nuevo.';
     elseif (($_POST['action'] ?? '') === 'delete') {
-        $target = editorial_post($database, (int) ($_POST['id'] ?? 0));
-        if (!$target || !can_manage_post($target)) { http_response_code(403); $error='No tienes permiso para eliminar esta publicación.'; }
-        else { $s=$database->prepare('DELETE FROM blog WHERE id_blog=:id'); $s->execute(['id'=>$target['id_blog']]); flash('Publicación eliminada.'); redirect('editorial.php'); }
+        $targetId = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: 0;
+        try {
+            $database->beginTransaction();
+            $lock = $database->prepare('SELECT b.id_blog, d.autor_id FROM blog b
+                JOIN blog_detalle d ON d.blog_id = b.id_blog WHERE b.id_blog = :id FOR UPDATE');
+            $lock->execute(['id' => $targetId]);
+            $target = $lock->fetch();
+            if (!$target || !can_manage_post($target)) {
+                $database->rollBack();
+                http_response_code(403);
+                $error = 'No tienes permiso para eliminar esta publicación.';
+            } else {
+                // Comentarios tiene ON DELETE RESTRICT. Las reacciones se borran en cascada.
+                $database->prepare('DELETE FROM comentarios WHERE blog_id = :id')->execute(['id' => $targetId]);
+                $database->prepare('DELETE FROM blog WHERE id_blog = :id')->execute(['id' => $targetId]);
+                $database->commit();
+                flash('Publicación eliminada.');
+                redirect('editorial.php');
+            }
+        } catch (PDOException $exception) {
+            if ($database->inTransaction()) $database->rollBack();
+            error_log('SIDE B: falló el borrado de la publicación ' . $targetId . ' (' . $exception->getCode() . ').');
+            $error = 'No fue posible eliminar la publicación. Inténtalo de nuevo.';
+        }
     } else {
         $title=trim((string)($_POST['titulo']??'')); $description=trim((string)($_POST['descripcion']??'')); $tags=trim((string)($_POST['tags']??''));
         $content=clean_editorial_html((string)($_POST['contenido']??'')); $state=in_array($_POST['estado']??'', ['borrador','revision','publicado','archivado'], true) ? $_POST['estado'] : 'borrador';
@@ -108,15 +123,66 @@ $artists=$database->query('SELECT id_artista,nombre FROM artista WHERE activo=TR
 $albums=$database->query('SELECT al.id_album, al.artista_id, al.titulo, ar.nombre AS artista FROM album al INNER JOIN artista ar ON ar.id_artista=al.artista_id ORDER BY ar.nombre,al.titulo')->fetchAll();
 $selectorArtists = array_map(static fn(array $artist): array => ['id'=>(int)$artist['id_artista'], 'name'=>$artist['nombre']], $artists);
 $selectorAlbums = array_map(static fn(array $album): array => ['id'=>(int)$album['id_album'], 'artistId'=>(int)$album['artista_id'], 'artist'=>$album['artista'], 'title'=>$album['titulo']], $albums);
-$posts=[];
-if ($mode==='list') { $sql='SELECT b.id_blog,b.titulo,b.slug,d.autor_id,d.estado,d.fecha_actualizacion,COALESCE(p.alias,u.nom_usr) autor FROM blog b INNER JOIN blog_detalle d ON d.blog_id=b.id_blog INNER JOIN usuario u ON u.id_usr=d.autor_id LEFT JOIN perfil_usuario p ON p.usr_id=u.id_usr'; if (!$isExecutive) $sql.=' WHERE d.autor_id=:user'; $sql.=' ORDER BY d.fecha_actualizacion DESC'; $s=$database->prepare($sql); $s->execute($isExecutive?[]:['user'=>(int)$_SESSION['user_id']]); $posts=$s->fetchAll(); }
+$posts = [];
+
+if ($mode === 'list') {
+    $sql = 'SELECT b.id_blog, b.titulo, b.slug, d.autor_id, d.estado, '
+         . 'd.fecha_actualizacion, COALESCE(p.alias, u.nom_usr) autor '
+         . 'FROM blog b '
+         . 'INNER JOIN blog_detalle d ON d.blog_id = b.id_blog '
+         . 'INNER JOIN usuario u ON u.id_usr = d.autor_id '
+         . 'LEFT JOIN perfil_usuario p ON p.usr_id = u.id_usr';
+
+    if (!$isExecutive) {
+        $sql .= ' WHERE d.autor_id = :user';
+    }
+
+    $sql .= ' ORDER BY d.fecha_actualizacion DESC';
+
+    $statement = $database->prepare($sql);
+    $statement->execute($isExecutive ? [] : ['user' => (int) $_SESSION['user_id']]);
+    $posts = $statement->fetchAll();
+}
 ?>
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Editorial — SIDE B</title><link rel="stylesheet" href="assets/css/variables.css"><link rel="stylesheet" href="assets/css/global.css"><link rel="stylesheet" href="assets/css/components.css"><link rel="stylesheet" href="assets/css/backstage.css"></head><body>
-<header class="site-header"><div class="container header-inner"><a class="brand" href="index.php">SIDE B<span class="brand-dot">.</span></a><nav class="primary-nav"><a class="nav-link" href="index.php">Ver sitio</a><?php if (in_array((int)$_SESSION['role_id'],[3,4],true)): ?><a class="nav-link" href="backstage.php">Backstage</a><?php endif; ?></nav><form class="logout-form" method="post" action="logout.php"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>"><button type="submit">Cerrar sesión</button></form></div></header>
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Editorial — SIDE B</title><link rel="stylesheet" href="assets/css/variables.css?v=20261120-7"><link rel="stylesheet" href="assets/css/global.css?v=20261118"><link rel="stylesheet" href="assets/css/components.css?v=20261118"><link rel="stylesheet" href="assets/css/backstage.css?v=20261120-6"><link rel="stylesheet" href="assets/css/admin-navigation.css?v=20261120-2"></head><body>
+<?= sideb_admin_header() ?>
 <main class="backstage-page container"><div class="backstage-heading"><div><p class="eyebrow">Contenido</p><h1>Editorial<br><em>SIDE B.</em></h1></div><p class="backstage-intro"><?= $isExecutive ? 'Gestiona todas las publicaciones y sus autores.' : 'Gestiona únicamente tus propias publicaciones.' ?></p></div>
 <?php if ($error): ?><p class="editorial-feedback" role="alert"><?= e($error) ?></p><?php endif; ?><?php if ($message=flash()): ?><p class="editorial-feedback is-success"><?= e($message) ?></p><?php endif; ?>
-<?php if ($mode==='list'): ?><div class="editorial-actions"><a class="button button-primary" href="editorial.php?view=new">Crear publicación</a></div><div class="editorial-list"><?php if (!$posts): ?><p class="backstage-note">Aún no hay publicaciones.</p><?php endif; ?><?php foreach($posts as $item): ?><article><div><p class="card-kicker"><?= e($item['estado']) ?></p><h2><?= e($item['titulo']) ?></h2><p>Por <?= e($item['autor']) ?> · Actualizada <?= e(date('d/m/Y',strtotime($item['fecha_actualizacion']))) ?></p></div><div><a class="text-link" href="editorial.php?view=edit&id=<?= (int)$item['id_blog'] ?>">Editar →</a><?php if($item['estado']==='publicado'): ?> <a class="text-link" href="publicacion.php?slug=<?= rawurlencode($item['slug']) ?>">Ver →</a><?php endif; ?></div></article><?php endforeach; ?></div>
-<?php else: ?><form class="editorial-form" method="post" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="save"><div class="form-field"><label for="titulo">Título</label><input id="titulo" name="titulo" maxlength="200" required value="<?= e($post['titulo']) ?>"></div><div class="form-field"><label for="descripcion">Descripción breve</label><textarea id="descripcion" name="descripcion" maxlength="500"><?= e($post['desc']) ?></textarea></div><div class="form-field"><label for="imagen">Imagen de portada (JPG, PNG o WebP; 5 MB máximo)</label><input id="imagen" name="imagen" type="file" accept="image/jpeg,image/png,image/webp"><?php if($post['img']): ?><small>Portada actual: <?= e($post['img']) ?></small><?php endif; ?></div><div class="form-field"><label for="tags">Etiquetas (separadas por comas)</label><input id="tags" name="tags" maxlength="255" value="<?= e($post['tags']) ?>"></div><div class="form-field"><label for="contenido">Contenido</label><div class="editor-tools"><button type="button" data-command="bold">Negrita</button><button type="button" data-command="italic">Cursiva</button><button type="button" data-command="formatBlock" data-value="h2">Subtítulo</button><button type="button" data-command="insertUnorderedList">Lista</button></div><div id="editor" class="content-editor" contenteditable="true"><?= $post['contenido'] ?></div><textarea id="contenido" name="contenido" hidden></textarea></div><div class="editorial-form-grid"><div class="form-field"><label for="estado">Estado</label><select id="estado" name="estado"><option value="borrador" <?= $post['estado']==='borrador'?'selected':'' ?>>Borrador</option><option value="revision" <?= $post['estado']==='revision'?'selected':'' ?>>En revisión</option><option value="publicado" <?= $post['estado']==='publicado'?'selected':'' ?>>Publicado</option><option value="archivado" <?= $post['estado']==='archivado'?'selected':'' ?>>Archivado</option></select></div><div class="form-field"><label for="artistas">Artistas relacionados</label><select id="artistas" name="artistas[]" multiple><?php foreach($artists as $artist): ?><option value="<?= (int)$artist['id_artista'] ?>" <?= in_array($artist['id_artista'],$post['artistas'])?'selected':'' ?>><?= e($artist['nombre']) ?></option><?php endforeach; ?></select></div><div class="form-field"><label for="albumes">Álbumes relacionados</label><select id="albumes" name="albumes[]" multiple><?php foreach($albums as $album): ?><option value="<?= (int)$album['id_album'] ?>" <?= in_array($album['id_album'],$post['albumes'])?'selected':'' ?>><?= e($album['artista'].' — '.$album['titulo']) ?></option><?php endforeach; ?></select></div></div><div class="editorial-actions"><button class="button button-secondary" type="button" id="preview">Vista previa</button><button class="button button-primary" type="submit">Guardar publicación</button><a class="text-link" href="editorial.php">Cancelar</a></div></form><section id="preview-pane" class="editorial-preview" hidden><p class="eyebrow">Vista previa</p><h2 id="preview-title"></h2><p id="preview-description"></p><article id="preview-content"></article></section><?php if($mode==='edit'): ?><form method="post" class="delete-form" onsubmit="return confirm('¿Eliminar esta publicación? Esta acción no se puede deshacer.');"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$post['id_blog'] ?>"><button type="submit">Eliminar publicación</button></form><?php endif; ?><?php endif; ?></main>
+<?php if ($mode === 'list'): ?>
+  <div class="editorial-actions">
+    <a class="button button-primary" href="editorial.php?view=new">Crear publicación</a>
+  </div>
+
+  <div class="editorial-list">
+    <?php if (!$posts): ?>
+      <p class="backstage-note">Aún no hay publicaciones.</p>
+    <?php endif; ?>
+
+    <?php foreach ($posts as $item): ?>
+      <article>
+        <div>
+          <p class="card-kicker"><?= e($item['estado']) ?></p>
+          <h2><?= e($item['titulo']) ?></h2>
+          <p>
+            Por <?= e($item['autor']) ?> ·
+            Actualizada <?= e(date('d/m/Y', strtotime($item['fecha_actualizacion']))) ?>
+          </p>
+        </div>
+
+        <div class="admin-record-actions">
+          <a class="button button-secondary" href="editorial.php?view=edit&id=<?= (int) $item['id_blog'] ?>">
+            Editar →
+          </a>
+          <?php if ($item['estado'] === 'publicado'): ?>
+            <a class="button button-secondary" href="publicacion.php?slug=<?= rawurlencode($item['slug']) ?>">
+              Ver →
+            </a>
+          <?php endif; ?>
+        </div>
+      </article>
+    <?php endforeach; ?>
+  </div>
+<?php else: ?><form class="editorial-form" method="post" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="save"><div class="form-field"><label for="titulo">Título</label><input id="titulo" name="titulo" maxlength="200" required value="<?= e($post['titulo']) ?>"></div><div class="form-field"><label for="descripcion">Descripción breve</label><textarea id="descripcion" name="descripcion" maxlength="500"><?= e($post['desc']) ?></textarea></div><div class="form-field"><label for="imagen">Imagen de portada (JPG, PNG o WebP; 5 MB máximo)</label><input id="imagen" name="imagen" type="file" accept="image/jpeg,image/png,image/webp"><?php if($post['img']): ?><small>Portada actual: <?= e($post['img']) ?></small><?php endif; ?></div><div class="form-field"><label for="tags">Etiquetas (separadas por comas)</label><input id="tags" name="tags" maxlength="255" value="<?= e($post['tags']) ?>"></div><div class="form-field"><label for="contenido">Contenido</label><div class="editor-tools"><button class="button button-secondary" type="button" data-command="bold">Negrita</button><button class="button button-secondary" type="button" data-command="italic">Cursiva</button><button class="button button-secondary" type="button" data-command="formatBlock" data-value="h2">Subtítulo</button><button class="button button-secondary" type="button" data-command="insertUnorderedList">Lista</button></div><div id="editor" class="content-editor" contenteditable="true"><?= $post['contenido'] ?></div><textarea id="contenido" name="contenido" hidden></textarea></div><div class="editorial-form-grid"><div class="form-field"><label for="estado">Estado</label><select id="estado" name="estado"><option value="borrador" <?= $post['estado']==='borrador'?'selected':'' ?>>Borrador</option><option value="revision" <?= $post['estado']==='revision'?'selected':'' ?>>En revisión</option><option value="publicado" <?= $post['estado']==='publicado'?'selected':'' ?>>Publicado</option><option value="archivado" <?= $post['estado']==='archivado'?'selected':'' ?>>Archivado</option></select></div><div class="form-field"><label for="artistas">Artistas relacionados</label><select id="artistas" name="artistas[]" multiple><?php foreach($artists as $artist): ?><option value="<?= (int)$artist['id_artista'] ?>" <?= in_array($artist['id_artista'],$post['artistas'])?'selected':'' ?>><?= e($artist['nombre']) ?></option><?php endforeach; ?></select></div><div class="form-field"><label for="albumes">Álbumes relacionados</label><select id="albumes" name="albumes[]" multiple><?php foreach($albums as $album): ?><option value="<?= (int)$album['id_album'] ?>" <?= in_array($album['id_album'],$post['albumes'])?'selected':'' ?>><?= e($album['artista'].' — '.$album['titulo']) ?></option><?php endforeach; ?></select></div></div><div class="editorial-actions"><button class="button button-secondary" type="button" id="preview">Vista previa</button><button class="button button-primary" type="submit">Guardar publicación</button><a class="button button-secondary" href="editorial.php">Cancelar</a></div></form><section id="preview-pane" class="editorial-preview" hidden><p class="eyebrow">Vista previa</p><h2 id="preview-title"></h2><p id="preview-description"></p><article id="preview-content"></article></section><?php if($mode==='edit'): ?><form method="post" class="delete-form" onsubmit="return confirm('¿Eliminar esta publicación y sus comentarios y reacciones? Esta acción no se puede deshacer.');"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$post['id_blog'] ?>"><button class="button button-secondary admin-danger" type="submit">Eliminar publicación</button></form><?php endif; ?><?php endif; ?></main>
 <script>
 const relationshipData = <?= json_encode(['artists'=>$selectorArtists, 'albums'=>$selectorAlbums], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
 (() => {

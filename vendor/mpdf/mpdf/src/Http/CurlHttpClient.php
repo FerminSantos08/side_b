@@ -92,13 +92,13 @@ class CurlHttpClient implements \Mpdf\Http\ClientInterface, \Psr\Log\LoggerAware
 				throw new \Mpdf\MpdfException($message);
 			}
 
-			curl_close($ch);
+			$this->closeCurl($ch);
 
 			return $response;
 		}
 
 		$info = curl_getinfo($ch);
-		if (isset($info['http_code']) && $info['http_code'] !== 200) {
+		if (isset($info['http_code']) && !str_starts_with((string) $info['http_code'], '2')) {
 			$message = sprintf('HTTP error: %d', $info['http_code']);
 			$this->logger->error($message, ['context' => LogContext::REMOTE_CONTENT]);
 
@@ -106,16 +106,22 @@ class CurlHttpClient implements \Mpdf\Http\ClientInterface, \Psr\Log\LoggerAware
 				throw new \Mpdf\MpdfException($message);
 			}
 
-			curl_close($ch);
+			$this->closeCurl($ch);
 
 			return $response->withStatus($info['http_code']);
 		}
 
-		curl_close($ch);
+		$this->closeCurl($ch);
 
 		return $response
 			->withStatus($info['http_code'])
 			->withBody(Stream::create($data));
 	}
 
+	private function closeCurl($ch)
+	{
+		if (PHP_VERSION_ID < 80000) {
+			curl_close($ch);
+		}
+	}
 }

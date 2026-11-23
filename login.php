@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/assets/php/bootstrap.php';
+require_once __DIR__ . '/assets/php/auth_layout.php';
 
 if (!empty($_SESSION['user_id'])) redirect(in_array((int) ($_SESSION['role_id'] ?? 0), [3, 4], true) ? 'backstage.php' : 'index.php');
 
@@ -34,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 $message = $error ?? flash();
+$messageState = $error ? 'error' : ($message === 'Cuenta creada. Ya puedes iniciar sesión.' ? 'success' : 'notice');
 ?>
 <!doctype html>
 <html lang="es">
@@ -43,29 +45,26 @@ $message = $error ?? flash();
 <link rel="icon" href="assets/favicons/sideb_sf.png" type="image/png">
 <link rel="apple-touch-icon" href="assets/favicons/sideb_sf.png">
 <link rel="manifest" href="assets/favicons/site.webmanifest">
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/variables.css"><link rel="stylesheet" href="assets/css/global.css"><link rel="stylesheet" href="assets/css/components.css"><link rel="stylesheet" href="assets/css/auth.css">
+  <link rel="stylesheet" href="assets/css/variables.css?v=20261120-7"><link rel="stylesheet" href="assets/css/global.css?v=20261118"><link rel="stylesheet" href="assets/css/components.css?v=20261118"><link rel="stylesheet" href="assets/css/auth.css?v=20261119-3">
 </head>
-<body>
-  <main class="auth-page">
-    <aside class="auth-aside"><a class="auth-brand" href="index.php" aria-label="SIDE B, inicio">SIDE B<span>.</span></a><div class="auth-art-copy"><p class="eyebrow">Tu lado de la música</p><h1>Vuelve a<br><em>escuchar.</em></h1><p>Historias, hallazgos y objetos para quienes quieren ir un poco más allá.</p></div><p class="auth-mark">Música · Cultura · Comunidad</p></aside>
+<body class="auth-body">
+  <?php sideb_auth_header(); ?>
+  <main id="contenido" class="auth-page">
     <section class="auth-main" aria-labelledby="login-title"><div class="auth-card">
-      <header class="auth-card-header"><p class="eyebrow">Bienvenido de nuevo</p><h2 id="login-title">Inicia sesión</h2><p>Continúa descubriendo lo que ocurre en el otro lado.</p></header>
+      <header class="auth-card-header"><p class="eyebrow">Bienvenido de nuevo</p><h1 id="login-title">Inicia sesión</h1><p>Continúa descubriendo lo que ocurre en el otro lado.</p></header>
       <form class="auth-form" method="post" novalidate>
-        <?php if ($message): ?><p class="form-feedback is-visible" aria-live="polite"><?= e($message) ?></p><?php endif; ?>
+        <?php if ($message): ?><p class="auth-feedback" data-state="<?= e($messageState) ?>" role="<?= $error ? 'alert' : 'status' ?>"><?= e($message) ?></p><?php endif; ?>
         <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-        <div class="form-field"><label for="login-email">Correo electrónico</label><input id="login-email" name="email" type="email" autocomplete="email" placeholder="tu@correo.com" required></div>
-        <div class="form-field"><label for="login-password">Contraseña</label><input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required></div>
+        <div class="form-field"><label for="login-email">Correo electrónico</label><input id="login-email" name="email" type="email" autocomplete="email" placeholder="tu@correo.com" value="<?= e(is_string($_POST['email'] ?? null) ? $_POST['email'] : '') ?>" required></div>
+        <?php sideb_auth_password('login-password', 'password', 'Contraseña', 'current-password'); ?>
         <div class="form-row"><label class="checkbox-control"><input type="checkbox" name="remember"> Recordarme</label><a class="auth-link" href="#recuperar">¿Olvidaste tu contraseña?</a></div>
-        <button class="auth-submit" type="submit">Iniciar sesión <span aria-hidden="true">↗</span></button>
-      <p class="form-feedback" data-form-feedback aria-live="polite"></p></form><p class="auth-switch">¿Todavía no tienes cuenta? <a class="auth-link" href="registro.php">Crear cuenta</a></p>
+        <button class="button button-primary auth-submit" type="submit">Iniciar sesión <span aria-hidden="true">↗</span></button>
+      </form>
+      <p class="auth-switch">¿Todavía no tienes cuenta? <a class="auth-link" href="registro.php">Crear cuenta</a></p>
     </div></section>
+    <aside class="auth-aside"><div class="auth-art-copy"><p class="eyebrow">Tu lado de la música</p><h2>Vuelve a<br><em>escuchar.</em></h2><p>Historias, hallazgos y objetos para quienes quieren ir un poco más allá.</p></div><p class="auth-mark">Música · Cultura · Comunidad</p></aside>
   </main>
-<?= sideb_footer() ?>
+<?php sideb_auth_footer(); ?>
+<script src="assets/js/auth.js?v=20261119-2" defer></script>
 </body>
 </html>
-
-
-
-

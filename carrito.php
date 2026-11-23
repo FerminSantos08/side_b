@@ -30,4 +30,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 $items=cart_items_for_user($database,$userId); $subtotal=array_reduce($items,static fn(float $sum,array $item):float=>$sum+(float)$item['precio']*(int)$item['cantidad'],0.0); $shipping=$items?99.0:0.0;
 ?>
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Carrito — SIDE B</title><link rel="stylesheet" href="assets/css/variables.css"><link rel="stylesheet" href="assets/css/global.css"><link rel="stylesheet" href="assets/css/components.css"><link rel="stylesheet" href="assets/css/home.css"><link rel="stylesheet" href="assets/css/shop.css"><link rel="stylesheet" href="assets/css/cart.css"></head><body><?=sideb_public_header('tienda')?><main class="cart-page container"><h1>Tu carrito.</h1><?php if($error):?><p class="editorial-feedback" role="alert"><?=e($error)?></p><?php endif;?><?php if($message=flash()):?><p class="editorial-feedback is-success"><?=e($message)?></p><?php endif;?><div class="cart-layout"><section class="cart-items" aria-label="Productos en el carrito"><?php foreach($items as $item):?><article class="cart-item"><a class="cart-thumb visual-surface visual-surface--record" href="producto.php?slug=<?=rawurlencode($item['slug'])?>"><?php if($item['imagen']):?><img src="<?=e($item['imagen'])?>" alt=""><?php endif;?></a><div><h2><?=e($item['nombre'])?></h2><p><?=e($item['categoria'])?></p><div class="cart-controls"><form method="post"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="update"><input type="hidden" name="product_id" value="<?=(int)$item['producto_id']?>"><input type="hidden" name="quantity" value="<?=max(1,(int)$item['cantidad']-1)?>"><button type="submit" aria-label="Reducir cantidad">−</button></form><span><?= (int)$item['cantidad'] ?></span><form method="post"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="update"><input type="hidden" name="product_id" value="<?=(int)$item['producto_id']?>"><input type="hidden" name="quantity" value="<?=(int)$item['cantidad']+1?>"><button type="submit" aria-label="Aumentar cantidad">+</button></form><form method="post"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="action" value="remove"><input type="hidden" name="product_id" value="<?=(int)$item['producto_id']?>"><button class="cart-remove" type="submit" aria-label="Eliminar <?=e($item['nombre'])?>">×</button></form></div></div><strong class="cart-price"><?=cart_money((float)$item['precio']*(int)$item['cantidad'])?></strong></article><?php endforeach;?><?php if(!$items):?><p class="cart-empty">Tu carrito está vacío. <a href="tienda.php">Explora la tienda.</a></p><?php endif;?></section><aside class="cart-summary"><h2>Resumen</h2><div class="summary-line"><span>Subtotal</span><span><?=cart_money($subtotal)?></span></div><div class="summary-line"><span>Envío</span><span><?=cart_money($shipping)?></span></div><div class="summary-line summary-total"><span>Total</span><span><?=cart_money($subtotal+$shipping)?></span></div><?php if($items):?><a class="button button-primary summary-button" href="checkout.php">Continuar al pago →</a><?php endif;?></aside></div></main><?=sideb_footer()?></body></html>
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Carrito — SIDE B</title>
+    <link rel="stylesheet" href="assets/css/variables.css?v=20261120-7">
+    <link rel="stylesheet" href="assets/css/global.css?v=20261118">
+    <link rel="stylesheet" href="assets/css/components.css?v=20261118">
+    <link rel="stylesheet" href="assets/css/home.css?v=20261118">
+    <link rel="stylesheet" href="assets/css/shop.css?v=20261118">
+    <link rel="stylesheet" href="assets/css/cart.css?v=20261118">
+    <link rel="stylesheet" href="assets/css/shop-purchase.css?v=20261119">
+</head>
+<body>
+<a class="skip-link" href="#contenido">Saltar al contenido</a>
+<?= sideb_public_header('tienda') ?>
+<main id="contenido" class="cart-page purchase-page container">
+    <a class="purchase-back" href="tienda.php"><span aria-hidden="true">←</span> Volver a la tienda</a>
+    <h1 class="purchase-title">Tu <em>carrito.</em></h1>
+    <?php if ($error): ?>
+        <p class="editorial-feedback" role="alert"><?= e($error) ?></p>
+    <?php endif; ?>
+    <?php if ($message = flash()): ?>
+        <p class="editorial-feedback is-success" role="status"><?= e($message) ?></p>
+    <?php endif; ?>
+
+    <?php if ($items): ?>
+        <div class="cart-layout">
+            <section class="cart-items" aria-label="Productos en el carrito">
+                <?php foreach ($items as $item): ?>
+                    <?php
+                    $quantity = (int) $item['cantidad'];
+                    $stock = (int) $item['stock'];
+                    $available = $item['activo'] && $stock > 0;
+                    ?>
+                    <article class="cart-item">
+                        <div class="cart-thumb">
+                            <?php if ($item['imagen']): ?>
+                                <img src="<?= e($item['imagen']) ?>" alt="">
+                            <?php endif; ?>
+                        </div>
+                        <div class="cart-item-info">
+                            <p class="card-kicker"><?= e($item['categoria']) ?></p>
+                            <h2><a href="producto.php?slug=<?= rawurlencode($item['slug']) ?>"><?= e($item['nombre']) ?></a></h2>
+                            <?php if (!$available): ?>
+                                <p class="cart-availability">Producto no disponible</p>
+                            <?php elseif ($quantity > $stock): ?>
+                                <p class="cart-availability">Disponibles: <?= $stock ?></p>
+                            <?php endif; ?>
+                            <div class="purchase-cart-actions">
+                                <form method="post" class="purchase-quantity" aria-label="Cantidad de <?= e($item['nombre']) ?>">
+                                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                    <input type="hidden" name="action" value="update">
+                                    <input type="hidden" name="product_id" value="<?= (int) $item['producto_id'] ?>">
+                                    <button type="submit" name="quantity" value="<?= $quantity - 1 ?>" aria-label="Reducir cantidad" <?= !$available || $quantity <= 1 ? 'disabled' : '' ?>>−</button>
+                                    <span aria-label="Cantidad actual"><?= $quantity ?></span>
+                                    <button type="submit" name="quantity" value="<?= $quantity + 1 ?>" aria-label="Aumentar cantidad" <?= !$available || $quantity >= $stock ? 'disabled' : '' ?>>+</button>
+                                </form>
+                                <form method="post">
+                                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                    <input type="hidden" name="action" value="remove">
+                                    <input type="hidden" name="product_id" value="<?= (int) $item['producto_id'] ?>">
+                                    <button class="purchase-remove" type="submit" aria-label="Quitar <?= e($item['nombre']) ?> del carrito">Quitar</button>
+                                </form>
+                            </div>
+                        </div>
+                        <strong class="cart-price"><?= cart_money((float) $item['precio'] * $quantity) ?></strong>
+                    </article>
+                <?php endforeach; ?>
+            </section>
+            <aside class="cart-summary" aria-labelledby="cart-summary-title">
+                <h2 id="cart-summary-title">Resumen del pedido</h2>
+                <div class="summary-line"><span>Subtotal</span><span><?= cart_money($subtotal) ?></span></div>
+                <div class="summary-line"><span>Envío</span><span><?= cart_money($shipping) ?></span></div>
+                <div class="summary-line summary-total"><span>Total</span><span><?= cart_money($subtotal + $shipping) ?></span></div>
+                <a class="button summary-button" href="checkout.php">Continuar al pago <span aria-hidden="true">→</span></a>
+            </aside>
+        </div>
+    <?php else: ?>
+        <section class="purchase-empty">
+            <h2>Tu carrito está vacío.</h2>
+            <a class="button button-primary" href="tienda.php">Explorar la tienda <span aria-hidden="true">→</span></a>
+        </section>
+    <?php endif; ?>
+</main>
+<?= sideb_footer() ?>
+</body>
+</html>

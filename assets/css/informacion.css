@@ -1,0 +1,17 @@
+.info-page { padding-block: var(--space-page); }
+.info-heading { max-width: 800px; margin-bottom: 3rem; }
+.info-heading .eyebrow { margin-bottom: 1rem; }
+.info-heading h1 { margin-block: 0 1.5rem; font-size: clamp(3.5rem, 8vw, 7rem); }
+.info-heading > p:last-child { max-width: 620px; color: var(--color-muted); font-size: 1.1rem; }
+.info-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); gap: clamp(2rem, 5vw, 5rem); }
+.info-content { max-width: 760px; overflow-wrap: anywhere; }
+.info-content h2 { margin-block: 2.5rem 1rem; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.1; }
+.info-content h2:first-child { margin-top: 0; }
+.info-content p { line-height: 1.8; }
+.info-content a, .info-aside a { text-decoration: underline; text-underline-offset: .2em; }
+.info-aside { align-self: start; padding: 1.5rem; border: 1px solid var(--color-border); background: var(--color-paper); }
+.info-aside p { margin-block: 1rem 0; color: var(--color-muted); line-height: 1.8; }
+@media (max-width: 700px) { .info-layout { grid-template-columns: 1fr; } }
+
+.info-aside { background: var(--color-panel); border-radius: var(--radius-panel); }
+.info-content { max-width: var(--width-prose); }

@@ -4,6 +4,7 @@ require_once __DIR__ . '/assets/php/bootstrap.php';
 $slug = trim((string) ($_GET['slug'] ?? ''));
 $post = null;
 $related = [];
+$postAlbums = [];
 $comments = [];
 $loadError = null;
 $savedPost = false;
@@ -36,6 +37,17 @@ if ($slug === '' || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug)) {
             http_response_code(404);
             $loadError = 'La publicación que buscas no está disponible.';
         } else {
+            $albumStatement = db()->prepare(
+                'SELECT al.titulo, al.portada, al.fecha_lanzamiento, a.nombre AS artista
+                 FROM blog_album ba
+                 JOIN album al ON al.id_album = ba.album_id
+                 JOIN artista a ON a.id_artista = al.artista_id AND a.activo = TRUE
+                 WHERE ba.blog_id = :id
+                 ORDER BY al.fecha_lanzamiento DESC, al.titulo, al.id_album'
+            );
+            $albumStatement->execute(['id' => $post['id_blog']]);
+            $postAlbums = $albumStatement->fetchAll();
+
             $relatedStatement = db()->prepare(
                 "SELECT b.titulo, b.img, b.tags, b.slug,
                         (SELECT GROUP_CONCAT(a.nombre ORDER BY a.nombre SEPARATOR ' / ')
@@ -74,7 +86,6 @@ if ($slug === '' || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug)) {
     }
 }
 
-$editorialLabel = $post ? publication_editorial_label($post['artista_nombre'] ?? null) : publication_editorial_label(null);
 $editorialKicker = $post ? publication_editorial_kicker($post['artista_nombre'] ?? null) : publication_editorial_kicker(null);
 $date = $post ? date('d/m/Y', strtotime($post['fecha_publicacion'])) : '';
 $wordCount = $post ? str_word_count(strip_tags((string) $post['contenido'])) : 0;
@@ -91,47 +102,80 @@ $image = $post ? publication_image_url($post['img']) : null;
   <link rel="icon" href="assets/favicons/sideb_sf.png" type="image/png">
   <link rel="apple-touch-icon" href="assets/favicons/sideb_sf.png">
   <link rel="manifest" href="assets/favicons/site.webmanifest">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/variables.css">
-  <link rel="stylesheet" href="assets/css/global.css">
-  <link rel="stylesheet" href="assets/css/components.css">
-  <link rel="stylesheet" href="assets/css/home.css">
-  <link rel="stylesheet" href="assets/css/posts.css">
-  <link rel="stylesheet" href="assets/css/posts-dynamic.css">
-  <link rel="stylesheet" href="assets/css/post-detail.css?v=3">
+  <link rel="stylesheet" href="assets/css/variables.css?v=20261120-7">
+  <link rel="stylesheet" href="assets/css/global.css?v=20261118">
+  <link rel="stylesheet" href="assets/css/components.css?v=20261118">
+  <link rel="stylesheet" href="assets/css/reactions.css?v=20261118-2">
+  <link rel="stylesheet" href="assets/css/home.css?v=20261118">
+  <link rel="stylesheet" href="assets/css/posts.css?v=20261118">
+  <link rel="stylesheet" href="assets/css/posts-dynamic.css?v=20261118">
+  <link rel="stylesheet" href="assets/css/post-detail.css?v=20261120-12">
 </head>
 <body>
   <a class="skip-link" href="#contenido">Saltar al contenido</a>
-  <header class="site-header"><div class="container header-inner"><a class="brand" href="index.php">SIDE B<span class="brand-dot">.</span></a><nav class="primary-nav" aria-label="Navegación principal"><a class="nav-link" href="index.php">Inicio</a><a class="nav-link" href="artistas.php">Artistas</a><a class="nav-link" href="#comunidad">Comunidad</a><a class="nav-link" href="tienda.php">Tienda</a></nav><div class="header-actions"><a class="icon-button" href="perfil.php" aria-label="Mi perfil"><span class="icon icon-user"></span></a><a class="icon-button cart-button" href="carrito.php" aria-label="Carrito"><span class="icon icon-bag"></span><span class="cart-count">0</span></a></div><button class="menu-button" type="button" aria-label="Abrir menú"><span></span><span></span></button><?= logout_control() ?></div></header>
+  <?php echo sideb_public_header('publicaciones'); ?>
   <main id="contenido" class="post-detail">
     <?php if ($loadError): ?>
       <section class="post-detail-header container"><p class="eyebrow">SIDE B</p><h1>Publicación<br><em>no disponible.</em></h1><p><?= e($loadError) ?></p><p><a class="text-link" href="publicaciones.php">Volver a publicaciones <span aria-hidden="true">↗</span></a></p></section>
     <?php else: ?>
-      <section class="post-article container">
-        <div class="detail-cover visual-surface visual-surface--portrait"><?php if ($image): ?><img src="<?= e($image) ?>" alt=""><span class="image-stamp"><?= e($editorialLabel) ?></span><?php endif; ?></div>
-        <header class="post-detail-header"><h1><?= e($post['titulo']) ?></h1><div class="post-detail-meta"><span class="post-category"><?= e($editorialKicker) ?></span><span>Por <?= e($post['autor']) ?> · <?= e($post['rol_autor']) ?></span><time datetime="<?= e($post['fecha_publicacion']) ?>"><?= e($date) ?></time><span><?= $readMinutes ?> min de lectura</span></div></header>
+      <article class="post-article container">
+        <a class="post-back" href="publicaciones.php"><span aria-hidden="true">←</span> Volver a publicaciones</a>
+        <header class="post-hero<?= $image ? ' has-cover' : '' ?>">
+          <div class="post-detail-header">
+            <p class="post-category"><?= e($editorialKicker) ?></p>
+            <h1><?= e($post['titulo']) ?></h1>
+            <?php if (!empty($post['desc'])): ?>
+              <p class="post-intro"><?= e($post['desc']) ?></p>
+            <?php endif; ?>
+            <div class="post-detail-meta">
+              <span>Por <?= e($post['autor']) ?> · <?= e($post['rol_autor']) ?></span>
+              <time datetime="<?= e($post['fecha_publicacion']) ?>"><?= e($date) ?></time>
+              <span><?= $readMinutes ?> min de lectura</span>
+            </div>
+          </div>
+          <?php if ($image): ?>
+            <figure class="detail-cover"><img src="<?= e($image) ?>" alt=""></figure>
+          <?php endif; ?>
+        </header>
         <div class="article-reading-layout">
           <!-- El HTML fue filtrado por clean_editorial_html() antes de persistirse. -->
-          <article class="detail-copy"><?= $post['contenido'] ?></article>
+          <div class="detail-copy"><?= $post['contenido'] ?></div>
           <aside class="interaction-panel" aria-label="Herramientas de la publicación">
-            <section class="library-card" aria-labelledby="library-title">
-              <p class="eyebrow">Tu biblioteca</p>
-              <h2 id="library-title">Guarda para después</h2>
-              <p class="library-description">Una buena historia merece volver a escucharse.</p>
+            <?php if ($postAlbums): ?>
+              <section class="post-albums" aria-labelledby="post-albums-title">
+                <h2 id="post-albums-title" class="eyebrow">En este artículo</h2>
+                <ul class="post-album-list">
+                  <?php foreach ($postAlbums as $album): ?>
+                    <li>
+                      <a class="post-album-link" href="<?= e(album_url($album['artista'], $album['titulo'])) ?>" aria-label="Explorar álbum: <?= e($album['titulo']) ?>">
+                        <?php if ($album['portada']): ?><img class="post-album-cover" src="<?= e($album['portada']) ?>" alt="" loading="lazy"><?php endif; ?>
+                        <h3><?= e($album['titulo']) ?></h3>
+                        <p class="post-album-artist"><?= e($album['artista']) ?></p>
+                        <?php if ($album['fecha_lanzamiento'] && substr($album['fecha_lanzamiento'], 0, 4) !== '0000'): ?>
+                          <p class="post-album-meta"><time datetime="<?= e($album['fecha_lanzamiento']) ?>"><?= e(substr($album['fecha_lanzamiento'], 0, 4)) ?></time></p>
+                        <?php endif; ?>
+                        <span class="post-album-action">Explorar álbum <span aria-hidden="true">↗</span></span>
+                      </a>
+                    </li>
+                  <?php endforeach; ?>
+                </ul>
+              </section>
+            <?php endif; ?>
+            <div class="post-save">
+              <?php $bookmark = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3.75A1.75 1.75 0 0 1 7.75 2h8.5A1.75 1.75 0 0 1 18 3.75V22l-6-3.75L6 22V3.75Z"/></svg>'; ?>
               <?php if (!empty($_SESSION['user_id'])): ?>
                 <form class="save-form" method="post" action="guardados.php">
                   <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                   <input type="hidden" name="action" value="toggle_post">
                   <input type="hidden" name="post_id" value="<?= (int) $post['id_blog'] ?>">
                   <input type="hidden" name="return_url" value="publicacion.php?slug=<?= rawurlencode($slug) ?>">
-                  <button class="save-article-button<?= $savedPost ? ' is-saved' : '' ?>" type="submit" aria-label="<?= $savedPost ? 'Quitar publicación de guardados' : 'Guardar publicación' ?>"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3.75A1.75 1.75 0 0 1 7.75 2h8.5A1.75 1.75 0 0 1 18 3.75V22l-6-3.75L6 22V3.75Z"/></svg><span><?= $savedPost ? 'Guardado' : 'Guardar artículo' ?></span></button>
+                  <button class="save-article-button<?= $savedPost ? ' is-saved' : '' ?>" type="submit" aria-pressed="<?= $savedPost ? 'true' : 'false' ?>"><?= $bookmark ?> Guardar artículo</button>
                 </form>
               <?php else: ?>
-                <p class="library-login"><a href="login.php">Inicia sesión</a> para guardar este artículo.</p>
+                <a class="save-article-button" href="login.php" aria-label="Guardar artículo, iniciar sesión"><?= $bookmark ?> Guardar artículo</a>
               <?php endif; ?>
-            </section>
+            </div>
+            <?php require __DIR__ . '/assets/php/publication_reactions.php'; ?>
             <section class="comments-section" id="comentarios" aria-labelledby="comments-title">
               <div class="comments-heading"><h2 id="comments-title">Comentarios</h2><span><?= count($comments) ?></span></div>
               <p class="mobile-availability"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="1.8"/><path d="M10.5 18.5h3"/></svg><span>Participa en la conversación desde la app móvil.</span></p>
@@ -145,8 +189,8 @@ $image = $post ? publication_image_url($post['img']) : null;
             </section>
           </aside>
         </div>
-      </section>
-      <?php if ($related): ?><section class="related-posts container"><p class="eyebrow">Sigue explorando</p><h2>También podría interesarte</h2><div class="editorial-grid"><?php foreach ($related as $index => $item): ?><?php $relatedImage = publication_image_url($item['img']); ?><article class="story-card"><a class="story-image visual-surface <?= $index === 0 ? 'visual-surface--warm' : 'visual-surface--olive' ?>" href="publicacion.php?slug=<?= rawurlencode($item['slug']) ?>"><?php if ($relatedImage): ?><img src="<?= e($relatedImage) ?>" alt=""><?php endif; ?><span class="image-number"><?= str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT) ?></span></a><div class="story-content"><p class="card-kicker"><?= e(publication_editorial_kicker($item['artista_nombre'] ?? null)) ?></p><h3><a href="publicacion.php?slug=<?= rawurlencode($item['slug']) ?>"><?= e($item['titulo']) ?></a></h3></div></article><?php endforeach; ?></div></section><?php endif; ?>
+      </article>
+      <?php if ($related): ?><section class="related-posts container"><h2>También podría interesarte</h2><div class="editorial-grid"><?php foreach ($related as $item): ?><?php $relatedImage = publication_image_url($item['img']); ?><article class="story-card"><a class="story-image related-cover" aria-label="<?= e($item['titulo']) ?>" href="publicacion.php?slug=<?= rawurlencode($item['slug']) ?>"><?php if ($relatedImage): ?><img src="<?= e($relatedImage) ?>" alt="" loading="lazy"><?php endif; ?></a><div class="story-content"><p class="card-kicker"><?= e(publication_editorial_kicker($item['artista_nombre'] ?? null)) ?></p><h3><a href="publicacion.php?slug=<?= rawurlencode($item['slug']) ?>"><?= e($item['titulo']) ?></a></h3></div></article><?php endforeach; ?></div></section><?php endif; ?>
     <?php endif; ?>
   </main>
   <?= sideb_footer() ?>

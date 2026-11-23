@@ -1,0 +1,3 @@
+ALTER TABLE solicitud_factura
+    MODIFY COLUMN regimen_fiscal CHAR(3) NULL DEFAULT NULL,
+    MODIFY COLUMN uso_cfdi CHAR(4) NULL DEFAULT NULL;

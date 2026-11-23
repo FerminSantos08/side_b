@@ -1,7 +1,10 @@
 .env
 .env.*
 !.env.example
-uploads/**/.*
 .idea/
+__pycache__/
 
-uploads/
+# Conservar la estructura, sin versionar imágenes subidas.
+uploads/**
+!uploads/**/
+!uploads/**/.gitkeep

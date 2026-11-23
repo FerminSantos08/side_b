@@ -44,7 +44,13 @@ function clean_editorial_html(string $html): string
         foreach (iterator_to_array($node->childNodes) as $child) {
             if ($child instanceof DOMElement) {
                 $tag = strtolower($child->tagName);
-                if (!isset($allowed[$tag])) { while ($child->firstChild) $child->parentNode->insertBefore($child->firstChild, $child); $child->parentNode->removeChild($child); continue; }
+                if (!isset($allowed[$tag])) {
+                    // Limpiar también el contenido antes de retirar su contenedor.
+                    $walk($child);
+                    while ($child->firstChild) $child->parentNode->insertBefore($child->firstChild, $child);
+                    $child->parentNode->removeChild($child);
+                    continue;
+                }
                 foreach (iterator_to_array($child->attributes) as $attribute) {
                     if (!in_array(strtolower($attribute->name), $allowed[$tag], true)) $child->removeAttributeNode($attribute);
                 }
@@ -60,17 +66,6 @@ function clean_editorial_html(string $html): string
 
 function upload_publication_image(array $file, ?string $previous = null): ?string
 {
-    $uploadError = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
-    // Algunos entornos PHP envían un campo vacío sin UPLOAD_ERR_NO_FILE.
-    if ($uploadError === UPLOAD_ERR_NO_FILE || empty($file['tmp_name']) || (int) ($file['size'] ?? 0) === 0) return $previous;
-    if ($uploadError !== UPLOAD_ERR_OK || (int) ($file['size'] ?? 0) > 5 * 1024 * 1024) throw new RuntimeException('La imagen debe pesar como máximo 5 MB.');
-    if (!class_exists('finfo')) throw new RuntimeException('El servidor no puede validar imágenes en este momento.');
-    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
-    $extensions = ['image/jpeg'=>'jpg', 'image/png'=>'png', 'image/webp'=>'webp'];
-    if (!isset($extensions[$mime])) throw new RuntimeException('Usa una imagen JPG, PNG o WebP válida.');
-    $name = bin2hex(random_bytes(16)) . '.' . $extensions[$mime];
-    $directory = dirname(__DIR__, 2) . '/uploads/publicaciones';
-    if (!is_dir($directory) && !mkdir($directory, 0755, true)) throw new RuntimeException('No fue posible preparar el directorio de imágenes.');
-    if (!move_uploaded_file($file['tmp_name'], $directory . '/' . $name)) throw new RuntimeException('No fue posible guardar la imagen.');
-    return $name;
+    $path = upload_backstage_image($file, 'publicaciones');
+    return $path === null ? $previous : basename($path);
 }

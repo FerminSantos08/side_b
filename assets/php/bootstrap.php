@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/footer.php';
+require_once __DIR__ . '/images.php';
 
 /* Las credenciales se leen del entorno: DB_HOST, DB_PORT, DB_NAME, DB_USER y DB_PASSWORD. */
 /* En desarrollo local también se leen desde el archivo .env en la raíz del proyecto. */
@@ -69,6 +70,11 @@ function artist_slug(string $name): string
     return trim($value, '-');
 }
 
+function album_url(string $artist, string $title): string
+{
+    return 'album.php?' . http_build_query(['artista' => $artist, 'album' => $title], '', '&', PHP_QUERY_RFC3986);
+}
+
 function publication_image_url(?string $filename): ?string
 {
     $filename = trim((string) $filename);
@@ -105,15 +111,14 @@ function upload_backstage_image(array $file, string $folder, ?string $previous =
     if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK || (int) ($file['size'] ?? 0) > 5 * 1024 * 1024) {
         throw new RuntimeException('La imagen debe pesar como máximo 5 MB.');
     }
-    $mime = (new finfo(FILEINFO_MIME_TYPE))->file((string) $file['tmp_name']);
-    $extensions = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
-    if (!isset($extensions[$mime])) throw new RuntimeException('Usa una imagen JPG, PNG o WebP válida.');
+    $source = (string) ($file['tmp_name'] ?? '');
+    if (!is_uploaded_file($source)) throw new RuntimeException('La subida de imagen no es válida.');
     $folder = trim($folder, '/');
     if (!preg_match('#^[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*$#', $folder)) throw new RuntimeException('Destino de imagen inválido.');
     $directory = dirname(__DIR__, 2) . '/uploads/' . $folder;
-    if (!is_dir($directory) && !mkdir($directory, 0755, true)) throw new RuntimeException('No fue posible preparar el directorio de imágenes.');
-    $filename = bin2hex(random_bytes(16)) . '.' . $extensions[$mime];
-    if (!move_uploaded_file((string) $file['tmp_name'], $directory . '/' . $filename)) throw new RuntimeException('No fue posible guardar la imagen.');
+    if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) throw new RuntimeException('No fue posible preparar el directorio de imágenes.');
+    $filename = bin2hex(random_bytes(16)) . '.webp';
+    convert_image_to_webp($source, $directory . '/' . $filename, $folder === 'perfiles' ? 512 : 1920);
     return 'uploads/' . $folder . '/' . $filename;
 }
 
@@ -131,56 +136,85 @@ function require_login(): int
     if (empty($_SESSION['user_id'])) { flash('Inicia sesión para acceder a tu perfil.'); redirect('login.php'); }
     return (int) $_SESSION['user_id'];
 }
-function logout_control(): string
+function logout_control(bool $adminPage = false): string
 {
     if (empty($_SESSION['user_id'])) return '';
-    $adminPage = in_array(basename((string) ($_SERVER['SCRIPT_NAME'] ?? '')), ['backstage.php', 'admin.php', 'editorial.php'], true);
     $class = $adminPage ? 'logout-form logout-form--admin' : 'logout-form';
     $label = $adminPage
         ? '<svg class="admin-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3M21 3v18"/></svg>Cerrar sesión'
         : '<svg class="logout-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg><span class="logout-icon-label">Cerrar sesión</span>';
     $buttonAttributes = $adminPage ? '' : ' class="logout-icon-button" aria-label="Cerrar sesión" data-tooltip="Cerrar sesión" title="Cerrar sesión"';
-    $form = '<form class="' . $class . '" method="post" action="logout.php"><input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '"><button type="submit"' . $buttonAttributes . '>' . $label . '</button></form>';
-    if (!$adminPage) return $form;
+    return '<form class="' . $class . '" method="post" action="logout.php"><input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '"><button type="submit"' . $buttonAttributes . '>' . $label . '</button></form>';
+}
 
-    $isExecutive = is_executive_producer();
+function sideb_admin_header(): string
+{
     $script = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
-    $module = $script === 'admin.php' ? (string) ($_GET['module'] ?? 'productos') : ($script === 'editorial.php' ? 'editorial' : ($script === 'roles.php' ? 'roles' : 'resumen'));
-    $items = [['resumen', 'Resumen', 'backstage.php'], ['editorial', 'Editorial', 'editorial.php']];
-    if ($isExecutive) {
-        $items = array_merge($items, [
-            ['productos', 'Productos', 'admin.php?module=productos'], ['categorias', 'Categorías', 'admin.php?module=categorias'],
-            ['artistas', 'Artistas', 'admin.php?module=artistas'], ['albumes', 'Álbumes', 'admin.php?module=albumes'],
-            ['pedidos', 'Pedidos', 'admin.php?module=pedidos'], ['usuarios', 'Usuarios', 'admin.php?module=usuarios'], ['roles', 'Roles', 'roles.php'],
-        ]);
-    }
+    $module = match ($script) {
+        'admin.php' => (string) ($_GET['module'] ?? 'productos'),
+        'editorial.php' => 'editorial',
+        'moderacion.php' => 'comentarios',
+        'roles.php' => 'roles',
+        default => 'resumen',
+    };
+    $hasOverview = in_array((int) ($_SESSION['role_id'] ?? 0), [3, 4], true);
+    $home = $hasOverview ? 'backstage.php' : 'editorial.php';
     $icons = [
-        'resumen' => '<svg class="admin-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>',
-        'editorial' => '<svg class="admin-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 9h8M8 13h5"/></svg>',
-        'productos' => '<svg class="admin-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M21 8l-9 5-9-5 9-5 9 5zM3 8v8l9 5 9-5V8"/></svg>',
-        'categorias' => '<svg class="admin-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5"/></svg>',
-        'artistas' => '<svg class="admin-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg>',
-        'albumes' => '<svg class="admin-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="M12 3v9"/></svg>',
-        'roles' => '<svg class="admin-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3l3 6 6 .9-4.3 4.2 1 5.9-5.7-3-5.7 3 1-5.9L3 9.9 9 9z"/></svg>',
-        'pedidos' => '<svg class="admin-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 7h12l1 13H5L6 7zM9 7a3 3 0 0 1 6 0"/></svg>',
-        'usuarios' => '<svg class="admin-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M16 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM21 20v-1a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+        'resumen' => '<path d="M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h6v6h-6z"/>',
+        'contenido' => '<path d="M4 5h16v14H4zM8 9h8m-8 4h6"/>',
+        'tienda' => '<path d="M5 8h14l1 12H4zM9 8a3 3 0 0 1 6 0"/>',
+        'acceso' => '<path d="M12 22s7-3 7-11V5l-7-3-7 3v6c0 8 7 11 7 11zM9 12l2 2 4-4"/>',
+        'cuenta' => '<circle cx="12" cy="8" r="3"/><path d="M5 20a7 7 0 0 1 14 0"/>',
     ];
-    $links = '';
-    foreach ($items as [$key, $text, $href]) $links .= '<a class="nav-link' . ($module === $key ? ' is-active' : '') . '" href="' . e($href) . '">' . ($icons[$key] ?? '') . '<span>' . e($text) . '</span></a>';
-    $account = '<div class="admin-account"><strong>' . e((string) ($_SESSION['user_name'] ?? '')) . '</strong><small>' . e((string) ($_SESSION['role_name'] ?? '')) . '</small></div>';
-    $javascript = 'document.addEventListener("DOMContentLoaded",function(){var nav=document.querySelector(".site-header .primary-nav"),form=document.querySelector(".site-header .logout-form--admin");if(!nav||!form)return;nav.classList.add("admin-nav");nav.innerHTML=' . json_encode($links, JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) . ';var account=document.createElement("div");account.innerHTML=' . json_encode($account, JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) . ';account=account.firstChild;form.parentNode.insertBefore(account,form);});';
-    $styles = '<style>
-      .site-header .admin-nav{align-items:center!important;display:flex!important;gap:1.35rem!important;margin-left:auto!important}
-      .site-header .admin-nav .nav-link{align-items:center!important;color:var(--color-muted)!important;display:inline-flex!important;font-size:13px!important;font-weight:500!important;gap:.45rem!important;padding:.85rem 0!important;position:relative!important;white-space:nowrap!important}
-      .site-header .admin-nav .nav-link::after{background:var(--color-terracotta)!important;bottom:-.1rem!important;content:""!important;height:2px!important;left:0!important;opacity:0;position:absolute!important;transform:scaleX(.55)!important;transform-origin:left!important;transition:opacity .2s ease,transform .2s ease!important;width:100%!important}
-      .site-header .admin-nav .nav-link:hover,.site-header .admin-nav .nav-link.is-active{color:var(--color-ink)!important}.site-header .admin-nav .nav-link:hover::after,.site-header .admin-nav .nav-link.is-active::after{opacity:1!important;transform:scaleX(1)!important}
-      .site-header .admin-nav .admin-nav-icon,.site-header .logout-form--admin .admin-nav-icon{fill:none!important;height:16px!important;max-height:16px!important;max-width:16px!important;stroke:currentColor!important;stroke-linecap:round!important;stroke-linejoin:round!important;stroke-width:1.7!important;width:16px!important}
-      .site-header .logout-form--admin{display:block!important;margin-left:-.85rem!important}.site-header .logout-form--admin button{align-items:center!important;background:transparent!important;border:0!important;color:var(--color-muted)!important;display:inline-flex!important;font-size:13px!important;font-weight:500!important;gap:.45rem!important;padding:.85rem .2rem!important}.site-header .logout-form--admin button:hover{color:var(--color-terracotta)!important}
-      .site-header .admin-account{border-left:1px solid var(--color-border)!important;display:grid!important;gap:.1rem!important;margin-left:.3rem!important;padding-left:.9rem!important}.site-header .admin-account strong{font-size:11px!important}.site-header .admin-account small{color:var(--color-muted)!important;font-size:10px!important}
-      .backstage-shell{display:block!important;max-width:980px!important;padding-top:3.5rem!important}.backstage-sidebar{display:none!important}.backstage-content{margin:0 auto!important;max-width:980px!important}
-      @media(max-width:1100px){.site-header .admin-nav{gap:.9rem!important;max-width:calc(100vw - 320px)!important;overflow-x:auto!important}}@media(max-width:760px){.site-header .admin-nav{margin-left:0!important;max-width:calc(100vw - 155px)!important;order:3;width:100%}.site-header .admin-account{display:none!important}.header-inner:has(.admin-nav){flex-wrap:wrap!important;gap:.6rem!important;padding:.7rem 0!important}}
-    </style>';
-    return $form . $styles . '<script>' . $javascript . 'document.addEventListener("DOMContentLoaded",function(){var brand=document.querySelector(".site-header .brand");if(brand)brand.href="backstage.php";});</script><script src="assets/js/admin-product-album.js" defer></script>';
+    $icon = static fn (string $key): string => isset($icons[$key])
+        ? '<svg class="admin-nav-icon" aria-hidden="true" viewBox="0 0 24 24">' . $icons[$key] . '</svg>'
+        : '';
+    $link = static function (string $key, string $label, string $href) use ($module, $icon): string {
+        $active = $module === $key;
+        return '<a class="admin-link' . ($active ? ' is-active' : '') . '"'
+            . ($active ? ' aria-current="page"' : '') . ' href="' . e($href) . '">' . $icon($key) . e($label) . '</a>';
+    };
+    $group = static function (string $label, array $items) use ($link, $module, $icon): string {
+        $active = in_array($module, array_column($items, 0), true);
+        $links = '';
+        foreach ($items as [$key, $text, $href]) {
+            $links .= $link($key, $text, $href);
+        }
+        return '<details class="admin-menu"><summary class="admin-link' . ($active ? ' is-active' : '')
+            . '">' . $icon(strtolower($label)) . e($label) . '</summary><div class="admin-menu-panel">' . $links . '</div></details>';
+    };
+    $navigation = $hasOverview ? $link('resumen', 'Resumen', 'backstage.php') : '';
+    if (is_executive_producer()) {
+        $navigation .= $group('Contenido', [
+            ['editorial', 'Publicaciones', 'editorial.php'],
+            ['comentarios', 'Comentarios', 'moderacion.php'],
+            ['artistas', 'Artistas', 'admin.php?module=artistas'],
+            ['albumes', 'Álbumes', 'admin.php?module=albumes'],
+        ]);
+        $navigation .= $group('Tienda', [
+            ['productos', 'Productos', 'admin.php?module=productos'],
+            ['categorias', 'Categorías', 'admin.php?module=categorias'],
+            ['pedidos', 'Pedidos', 'admin.php?module=pedidos'],
+        ]);
+        $navigation .= $group('Acceso', [
+            ['usuarios', 'Usuarios', 'admin.php?module=usuarios'],
+            ['roles', 'Roles y permisos', 'roles.php'],
+        ]);
+    } else {
+        $navigation .= $link('editorial', 'Publicaciones', 'editorial.php');
+    }
+    $account = '<details class="admin-menu admin-account"><summary class="admin-link">' . $icon('cuenta') . 'Cuenta</summary>'
+        . '<div class="admin-menu-panel"><div class="admin-account-name"><strong>'
+        . e((string) ($_SESSION['user_name'] ?? '')) . '</strong><small>'
+        . e((string) ($_SESSION['role_name'] ?? '')) . '</small></div>'
+        . '<a class="admin-link" href="index.php">Ver sitio <span aria-hidden="true">↗</span></a>'
+        . logout_control(true) . '</div></details>';
+
+    return '<header class="site-header admin-header"><div class="container header-inner"><a class="brand" href="' . $home
+        . '" aria-label="SIDE B, Backstage">SIDE B<span class="brand-dot">.</span></a>'
+        . '<nav class="admin-nav" aria-label="Administración">' . $navigation . '</nav>'
+        . $account . '</div></header><script src="assets/js/admin-navigation.js?v=20261120" defer></script>'
+        . ($script === 'admin.php' ? '<script src="assets/js/admin-product-album.js" defer></script>' : '');
 }
 
 function sideb_profile_menu(string $active): string
@@ -240,7 +274,7 @@ function paypal_config(): array
 }
 
 /** @return array<string,mixed> */
-function paypal_request(string $method, string $path, ?array $payload = null): array
+function paypal_request(string $method, string $path, ?array $payload = null, ?string $requestId = null): array
 {
     if (!function_exists('curl_init')) throw new RuntimeException('El servidor no tiene habilitada la extensión cURL. Reinicia Apache después de configurar PHP.');
     $config = paypal_config();
@@ -256,10 +290,12 @@ function paypal_request(string $method, string $path, ?array $payload = null): a
     }
     $request = curl_init($config['base_url'] . $path);
     $headers = ['Authorization: Bearer ' . $token['access_token'], 'Accept: application/json'];
+    if ($requestId !== null) $headers[] = 'PayPal-Request-Id: ' . $requestId;
     // PayPal exige este encabezado también en POST sin cuerpo, como la captura de una orden.
     if ($payload !== null || in_array($method, ['POST', 'PUT', 'PATCH'], true)) $headers[] = 'Content-Type: application/json';
     curl_setopt_array($request, [CURLOPT_CUSTOMREQUEST => $method, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 25, CURLOPT_HTTPHEADER => $headers]);
     if ($payload !== null) curl_setopt($request, CURLOPT_POSTFIELDS, json_encode($payload, JSON_THROW_ON_ERROR));
+    elseif ($method === 'POST') curl_setopt($request, CURLOPT_POSTFIELDS, '{}');
     $body = curl_exec($request); $code = (int) curl_getinfo($request, CURLINFO_RESPONSE_CODE);
     $requestError = curl_error($request);
     curl_close($request);
@@ -294,23 +330,71 @@ function require_editorial_user(): void
 
 function sideb_public_header(string $active): string
 {
-    $links = ['inicio' => ['Inicio', 'index.php'], 'artistas' => ['Artistas', 'artistas.php'], 'tienda' => ['Tienda', 'tienda.php']];
+    $page = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    $currentSearch = $page === 'buscar.php' ? ' aria-current="page"' : '';
+    $currentAccount = in_array($page, ['perfil.php', 'guardados.php', 'pedidos.php', 'login.php', 'registro.php'], true)
+        ? ' aria-current="page"' : '';
+    $currentCart = in_array($page, ['carrito.php', 'checkout.php', 'pago.php', 'pago_exitoso.php'], true)
+        ? ' aria-current="page"' : '';
+    $links = [
+        'inicio' => ['Inicio', 'index.php'],
+        'artistas' => ['Artistas', 'artistas.php'],
+        'publicaciones' => ['Publicaciones', 'publicaciones.php'],
+        'tienda' => ['Tienda', 'tienda.php'],
+    ];
     $navIcons = [
+        'publicaciones' => '<svg class="public-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 9h8M8 13h8M8 16h4"/></svg>',
         'inicio' => '<svg class="public-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5V20H3zM9 20v-5h6v5"/></svg>',
         'artistas' => '<svg class="public-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M5 20c.5-4 2.8-6 7-6s6.5 2 7 6"/></svg>',
         'tienda' => '<svg class="public-nav-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M5 8h14l1 12H4zM9 8a3 3 0 0 1 6 0"/></svg>',
     ];
     $nav = '';
-    foreach ($links as $key => [$label, $href]) $nav .= '<a class="nav-link' . ($active === $key ? ' is-active' : '') . '" href="' . $href . '">' . $navIcons[$key] . '<span>' . $label . '</span></a>';
+    foreach ($links as $key => [$label, $href]) {
+        $current = $active === $key;
+        $nav .= '<a class="nav-link' . ($current ? ' is-active' : '') . '" href="' . $href . '"'
+            . ($current ? ' aria-current="' . ($page === $href ? 'page' : 'location') . '"' : '')
+            . '>' . $navIcons[$key] . '<span>' . $label . '</span></a>';
+    }
     $cartCount = cart_count_for_current_user();
-    return '<header class="site-header"><div class="container header-inner"><a class="brand" href="index.php" aria-label="SIDE B, inicio">SIDE B<span class="brand-dot">.</span></a><nav class="primary-nav" aria-label="Navegación principal">' . $nav . '</nav><div class="header-actions"><a class="icon-button" href="publicaciones.php" aria-label="Buscar publicaciones"><svg class="public-action-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m16 16 5 5"/></svg></a><a class="icon-button" href="perfil.php" aria-label="Mi perfil"><svg class="public-action-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M5 20c.5-4 2.8-6 7-6s6.5 2 7 6"/></svg></a><a class="icon-button cart-button" href="carrito.php" aria-label="Carrito"><svg class="public-action-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 4h2l2 11h10l2-8H6M9 20h.01M17 20h.01"/></svg><span class="cart-count">' . $cartCount . '</span></a></div><button class="menu-button" type="button" aria-label="Abrir menú"><span></span><span></span></button>' . logout_control() . '</div></header>';
+    return '<header class="site-header public-header"><div class="container header-inner">'
+        . '<a class="brand" href="index.php" aria-label="SIDE B, inicio">SIDE B<span class="brand-dot">.</span></a>'
+        . '<nav id="sideb-navigation" class="primary-nav" aria-label="Navegación principal">' . $nav . '</nav>'
+        . '<div class="header-actions"><a class="icon-button" href="buscar.php" data-search-open aria-label="Buscar en SIDE B"' . $currentSearch . '>'
+        . '<svg class="public-action-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m16 16 5 5"/></svg></a>'
+        . '<a class="icon-button" href="perfil.php" aria-label="Mi perfil"' . $currentAccount . '>'
+        . '<svg class="public-action-icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M5 20c.5-4 2.8-6 7-6s6.5 2 7 6"/></svg></a>'
+        . '<a class="icon-button cart-button" href="carrito.php" aria-label="Carrito"' . $currentCart . '>'
+        . '<svg class="public-action-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 4h2l2 11h10l2-8H6M9 20h.01M17 20h.01"/></svg>'
+        . '<span class="cart-count">' . $cartCount . '</span></a>' . logout_control() . '</div>'
+        . '<button class="menu-button" type="button" aria-label="Menú principal" aria-controls="sideb-navigation" aria-expanded="false"><span></span><span></span></button>'
+        . '</div>' . sideb_search_dropdown() . '</header>'
+        . '<script src="assets/js/navigation.js?v=20261118" defer></script>'
+        . '<script src="assets/js/search-overlay.js?v=20261119-2" defer></script>';
 }
 
-$sidebPublicPages = ['index.php' => 'inicio', 'artistas.php' => 'artistas', 'artista.php' => 'artistas', 'tienda.php' => 'tienda', 'producto.php' => 'tienda', 'carrito.php' => 'tienda', 'publicaciones.php' => '', 'publicacion.php' => '', 'perfil.php' => '', 'guardados.php' => ''];
-$sidebScript = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
-if (isset($sidebPublicPages[$sidebScript])) {
-    $sidebActive = $sidebPublicPages[$sidebScript];
-    ob_start(static fn(string $html): string => preg_replace('#<header class="site-header">.*?</header>#s', sideb_public_header($sidebActive), $html, 1) ?? $html);
+function sideb_search_dropdown(): string
+{
+    return <<<'HTML'
+<link rel="stylesheet" href="assets/css/search-overlay.css?v=20261120-1">
+<div class="search-dropdown" id="sideb-search" hidden>
+    <form class="container search-dropdown-form" role="search" aria-label="Búsqueda rápida" action="buscar.php" method="get">
+        <div class="search-dropdown-field">
+            <input class="field-control" id="sideb-search-query" name="q" type="search" placeholder="Artistas, álbumes, publicaciones o productos" aria-label="Buscar en SIDE B" maxlength="100" autocomplete="off">
+            <button class="search-dropdown-submit" type="submit" aria-label="Buscar">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 5 5"></path></svg>
+            </button>
+            <button class="search-dropdown-close" type="button" aria-label="Cerrar búsqueda">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg>
+            </button>
+        </div>
+        <div class="search-dropdown-panel">
+            <p class="search-dropdown-status" role="status">Escribe al menos dos caracteres.</p>
+            <div class="search-dropdown-results" aria-label="Resultados rápidos"></div>
+            <button class="search-dropdown-all" type="submit">Ver todos los resultados <span aria-hidden="true">↗</span></button>
+        </div>
+    </form>
+</div>
+HTML;
 }
 
 function sideb_favicon_markup(): string
