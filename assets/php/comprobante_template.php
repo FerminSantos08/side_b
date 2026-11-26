@@ -20,6 +20,18 @@ function sideb_comprobante_pdf_image(string $source): string
     return $written ? 'data:image/png;base64,' . base64_encode($png) : '';
 }
 
+function sideb_document_header(string $document, string $title, string $date, string $status = ''): string
+{
+    $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+    return '<div class="receipt-header"><table class="receipt-columns" role="presentation"><tr>'
+        . '<td class="receipt-column brand-block"><img class="receipt-logo" src="assets/favicons/sideb_sf.png" alt=""><br>'
+        . '<strong class="brand">SIDE B<span>.</span></strong><p>Música · Cultura · Comunidad</p></td>'
+        . '<td class="receipt-column document-block"><p class="eyebrow">' . $escape($document) . '</p>'
+        . '<h1>' . $escape($title) . '</h1><p>' . $escape($date) . '</p>'
+        . ($status === '' ? '' : '<span class="status">' . $escape($status) . '</span>')
+        . '</td></tr></table></div>';
+}
+
 /** @param list<array<string,mixed>> $detalles */
 function sideb_comprobante_html(array $pedido, array $detalles, ?array $invoice = null): string
 {
@@ -68,7 +80,7 @@ function sideb_comprobante_html(array $pedido, array $detalles, ?array $invoice 
             . '<p><strong>Código postal fiscal:</strong> ' . $e($invoice['codigo_postal']) . '</p></div>';
     }
     return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . $e($document) . ' ' . $e($folio) . ' — SIDE B</title></head><body><main class="receipt-canvas"><article class="page">'
-        . '<div class="receipt-header"><table class="receipt-columns" role="presentation"><tr><td class="receipt-column brand-block"><img class="receipt-logo" src="assets/favicons/sideb_sf.png" alt=""><br><strong class="brand">SIDE B<span>.</span></strong><p>Música · Cultura · Comunidad</p></td><td class="receipt-column document-block"><p class="eyebrow">' . $e($document) . '</p><h1>' . $e($folio) . '</h1><p>' . $e($dateLabel) . '</p><span class="status">' . $e($status) . '</span></td></tr></table></div>'
+        . sideb_document_header($document, $folio, $dateLabel, $status)
         . '<div class="customer-section"><table class="receipt-columns" role="presentation"><tr><td class="receipt-column"><p class="section-label">Cliente</p><h2>' . $e($pedido['cliente'] ?: 'No registrado') . '</h2><p>' . $e($pedido['correo'] ?: 'Correo no registrado') . '</p></td><td class="receipt-column"><p class="section-label">Entrega</p><p>' . nl2br($e($pedido['direccion_envio'] ?: 'Dirección no registrada')) . '</p><p class="order-date">Pedido realizado: ' . $e(date('d/m/Y', strtotime((string) $pedido['fecha']))) . '</p></td></tr></table></div>'
         . $billing
         . '<section class="items-section"><p class="section-label">Artículos</p><table class="receipt-items"><thead><tr><th>Producto</th><th class="center">Cant.</th><th class="amount">' . $priceLabel . '</th><th class="amount">' . $amountLabel . '</th></tr></thead><tbody>' . $rows . '</tbody></table></section>'

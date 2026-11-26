@@ -155,6 +155,7 @@ function sideb_admin_header(): string
         'editorial.php' => 'editorial',
         'moderacion.php' => 'comentarios',
         'roles.php' => 'roles',
+        'reportes.php' => 'reportes',
         default => 'resumen',
     };
     $hasOverview = in_array((int) ($_SESSION['role_id'] ?? 0), [3, 4], true);
@@ -163,6 +164,7 @@ function sideb_admin_header(): string
         'resumen' => '<path d="M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h6v6h-6z"/>',
         'contenido' => '<path d="M4 5h16v14H4zM8 9h8m-8 4h6"/>',
         'tienda' => '<path d="M5 8h14l1 12H4zM9 8a3 3 0 0 1 6 0"/>',
+        'reportes' => '<path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6m-6 4h6"/>',
         'acceso' => '<path d="M12 22s7-3 7-11V5l-7-3-7 3v6c0 8 7 11 7 11zM9 12l2 2 4-4"/>',
         'cuenta' => '<circle cx="12" cy="8" r="3"/><path d="M5 20a7 7 0 0 1 14 0"/>',
     ];
@@ -196,6 +198,7 @@ function sideb_admin_header(): string
             ['categorias', 'Categorías', 'admin.php?module=categorias'],
             ['pedidos', 'Pedidos', 'admin.php?module=pedidos'],
         ]);
+        $navigation .= $link('reportes', 'Reportes', 'reportes.php');
         $navigation .= $group('Acceso', [
             ['usuarios', 'Usuarios', 'admin.php?module=usuarios'],
             ['roles', 'Roles y permisos', 'roles.php'],
@@ -207,7 +210,6 @@ function sideb_admin_header(): string
         . '<div class="admin-menu-panel"><div class="admin-account-name"><strong>'
         . e((string) ($_SESSION['user_name'] ?? '')) . '</strong><small>'
         . e((string) ($_SESSION['role_name'] ?? '')) . '</small></div>'
-        . '<a class="admin-link" href="index.php">Ver sitio <span aria-hidden="true">↗</span></a>'
         . logout_control(true) . '</div></details>';
 
     return '<header class="site-header admin-header"><div class="container header-inner"><a class="brand" href="' . $home
